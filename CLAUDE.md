@@ -30,7 +30,7 @@ Internal team management web app for Nico Barrera Academy × Mind Fuel (6-person
 npm run dev          # Start dev server (localhost:3000)
 npm run build        # Production build
 npm run lint         # ESLint
-npm test             # Run tests
+npx tsc --noEmit     # Type check without building
 ```
 
 ## Architecture
@@ -71,7 +71,7 @@ src/app/
 | Role | Access |
 |------|--------|
 | `super_admin` (Juan David V.) | Full access. Only role that can register bonus events. |
-| `ceo` (Nico Barrera) | Same as admin but read-only for performance/bonuses. Can register bonus events. |
+| `ceo` (Nico Barrera) | Read access to all dashboards/bonuses. Cannot register bonus events. |
 | `member` | Own tasks, own performance, own bonus position, own calendar. |
 
 Auth uses Discord OAuth with a whitelist — only 6 approved Discord IDs can log in.
@@ -81,6 +81,17 @@ Auth uses Discord OAuth with a whitelist — only 6 approved Discord IDs can log
 Core tables: `users`, `tasks`, `task_comments`, `task_recurrences`, `task_categories`, `bonus_launches`, `bonus_events`, `daily_reports`, `activity_log`, `user_absences`
 
 RLS enforced: members see only their own data. Admin/CEO see all.
+
+SQL definitions in `supabase/schema.sql` (DDL), `supabase/seed.sql` (initial data), `supabase/rls.sql` (policies). Run these in Supabase SQL Editor in order.
+
+### Key Lib Files
+
+- `src/lib/types.ts` — All TypeScript interfaces + `Database` type map for Supabase client generics
+- `src/lib/constants.ts` — Roles, statuses, priorities, nav items, bonus config, default categories
+- `src/lib/supabase/database.ts` — Helpers: `getCurrentUser()`, `isAdmin()`, `isSuperAdmin()`, `logActivity()`
+- `src/lib/supabase/client.ts` — Browser client (use in `"use client"` components)
+- `src/lib/supabase/server.ts` — Server client (use in Server Components, route handlers)
+- `src/lib/supabase/admin.ts` — Service role client (bypasses RLS, use in API routes/cron only)
 
 ### Notification Architecture
 
@@ -111,11 +122,10 @@ App (Next.js API) ←→ n8n workflows ←→ Discord Bot (Lau)
 
 ## File Organization
 
-- `/src` — source code
-- `/tests` — test files
-- `/docs` — documentation
-- `/config` — configuration files
-- `/scripts` — utility scripts
+- `/src` — source code (Next.js App Router)
+- `/supabase` — SQL schema, seed data, RLS policies
+- `/docs` — project plans and documentation
+- `/public` — static assets, PWA manifest, icons
 
 ## Concurrency Rules
 
