@@ -1,0 +1,21 @@
+{
+  "name": "Mind Fuel Team",
+  "short_name": "MF Team",
+  "description": "Gestión de equipo — Nico Barrera Academy × Mind Fuel",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#e91e63",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
