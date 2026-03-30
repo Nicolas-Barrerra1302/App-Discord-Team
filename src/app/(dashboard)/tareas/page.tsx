@@ -108,14 +108,16 @@ export default async function TasksPage({
   };
 
   return (
-    <Suspense fallback={<KanbanSkeleton />}>
-      <KanbanBoard
-        initialTasks={tasksWithCounts}
-        categories={categories ?? []}
-        users={(users ?? []) as User[]}
-        currentUser={user}
-      />
-    </Suspense>
+    <div className="flex w-full max-w-full flex-col overflow-x-hidden">
+      <Suspense fallback={<KanbanSkeleton />}>
+        <KanbanBoard
+          initialTasks={tasksWithCounts}
+          categories={categories ?? []}
+          users={(users ?? []) as User[]}
+          currentUser={user}
+        />
+      </Suspense>
+    </div>
   );
 }
 

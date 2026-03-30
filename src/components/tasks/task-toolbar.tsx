@@ -33,11 +33,13 @@ export function TaskToolbar({
   onSortChange,
 }: TaskToolbarProps) {
   return (
-    <div className="space-y-3">
+    <div className="w-full space-y-3">
       {/* Top row */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <TaskSearchBar />
-        <div className="flex items-center gap-2">
+      <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+        <div className="w-full md:w-64 md:flex-none">
+          <TaskSearchBar />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {/* Sort control */}
           <div className="flex items-center rounded-lg border border-white/10 bg-card-secondary">
             <ArrowUpDown className="ml-2.5 h-3.5 w-3.5 text-text-muted" />
