@@ -48,7 +48,7 @@ export default async function DashboardLayout({
       <Sidebar user={user} />
       <main
         id="main-content"
-        className="flex-1 overflow-y-auto p-6 pt-16 lg:p-8 lg:pt-8"
+        className="flex-1 overflow-x-hidden overflow-y-auto overscroll-x-none p-6 pt-16 lg:p-8 lg:pt-8"
         aria-label="Contenido principal"
       >
         {children}

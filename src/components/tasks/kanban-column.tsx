@@ -46,7 +46,8 @@ export const KanbanColumn = memo(function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex min-h-[200px] w-[85vw] min-w-[85vw] md:w-80 md:min-w-[300px] flex-shrink-0 flex-col rounded-xl border border-white/5 bg-card/50 transition-colors snap-center md:snap-align-none",
+        "flex min-h-[200px] w-[85vw] min-w-[85vw] max-w-[85vw] shrink-0 snap-center flex-col rounded-xl border border-white/5 bg-card/50 transition-colors",
+        "md:w-80 md:min-w-[300px] md:max-w-none md:shrink md:snap-align-none",
         isOver && "border-white/20 bg-card/80"
       )}
     >

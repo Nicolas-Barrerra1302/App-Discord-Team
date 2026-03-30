@@ -763,7 +763,9 @@ export function KanbanBoard({
         <div
           ref={scrollContainerRef}
           className={cn(
-            "flex w-full flex-nowrap gap-4 overflow-x-auto pb-4 pr-4 transition-opacity md:snap-none",
+            "flex w-full flex-nowrap gap-4 overflow-x-auto overscroll-x-contain pb-4 pr-4 transition-opacity",
+            "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            "md:snap-none",
             isDragging ? "snap-none" : "snap-x snap-mandatory",
             loading && "opacity-60"
           )}
