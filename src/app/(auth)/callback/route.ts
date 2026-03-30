@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         // Whitelist check: user must exist in the pre-seeded users table
         const { data: dbUser } = await supabase
           .from('users')
-          .select('id, discord_id, role')
+          .select('id, discord_id, role, name, avatar_url')
           .eq('discord_id', discordId)
           .single();
 
@@ -44,8 +44,30 @@ export async function GET(request: Request) {
           );
         }
 
-        // User is whitelisted — proceed to dashboard
-        return NextResponse.redirect(`${origin}/dashboard`);
+        // User is whitelisted — sync avatar & name from Discord
+        const avatarHash = user.user_metadata?.avatar_url;
+        const discordName =
+          user.user_metadata?.custom_claims?.global_name ??
+          user.user_metadata?.global_name ??
+          user.user_metadata?.full_name ??
+          null;
+
+        const updates: Record<string, string> = {};
+        if (avatarHash && avatarHash !== dbUser.avatar_url) {
+          updates.avatar_url = avatarHash;
+        }
+        if (discordName && discordName !== dbUser.name) {
+          updates.name = discordName;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', dbUser.id);
+        }
+
+        return NextResponse.redirect(`${origin}/`);
       }
     }
   }

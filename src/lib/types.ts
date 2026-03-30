@@ -1,10 +1,15 @@
 // =============================================================================
-// Mind Fuel Team — Database Type Definitions
-// Mirrors the Supabase PostgreSQL schema exactly.
+// Equipo Nico Barrera — Application Type Definitions
+// Derives table types from database.types.ts, adds application-level types.
 // =============================================================================
 
+import type { Database, Json } from './database.types';
+
+// Re-export for convenience
+export type { Database, Json };
+
 // ---------------------------------------------------------------------------
-// Enums / Union Types
+// Enum / Union Types
 // ---------------------------------------------------------------------------
 
 export type UserRole = 'super_admin' | 'ceo' | 'member';
@@ -19,6 +24,8 @@ export type BonusLaunchStatus = 'active' | 'projected' | 'closed';
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
+export type TaskType = 'planeada' | 'incendio';
+
 // ---------------------------------------------------------------------------
 // Nested Interfaces
 // ---------------------------------------------------------------------------
@@ -31,201 +38,183 @@ export interface NotificationPreferences {
 }
 
 // ---------------------------------------------------------------------------
-// Table Interfaces
+// Row types — what Supabase queries return
 // ---------------------------------------------------------------------------
 
-export interface User {
-  id: string;
-  discord_id: string;
-  name: string;
-  avatar_url: string | null;
-  role: UserRole;
-  area: string | null;
-  is_active: boolean;
-  notification_preferences: NotificationPreferences;
-  created_at: string;
+export type User = Database['public']['Tables']['users']['Row'];
+export type TaskCategory = Database['public']['Tables']['task_categories']['Row'];
+export type TaskRecurrence = Database['public']['Tables']['task_recurrences']['Row'];
+export type Task = Database['public']['Tables']['tasks']['Row'];
+export type TaskComment = Database['public']['Tables']['task_comments']['Row'];
+export type BonusLaunch = Database['public']['Tables']['bonus_launches']['Row'];
+export type BonusEvent = Database['public']['Tables']['bonus_events']['Row'];
+export type DailyCheckin = Database['public']['Tables']['daily_checkins']['Row'];
+export type DailyReport = Database['public']['Tables']['daily_reports']['Row'];
+export type ActivityLog = Database['public']['Tables']['activity_log']['Row'];
+export type UserAbsence = Database['public']['Tables']['user_absences']['Row'];
+export type KpiDefinition = Database['public']['Tables']['kpi_definitions']['Row'];
+export type KpiTracking = Database['public']['Tables']['kpi_tracking']['Row'];
+export type KpiSubmission = Database['public']['Tables']['kpi_submissions']['Row'];
+
+// ---------------------------------------------------------------------------
+// Insert types — what .insert() accepts
+// ---------------------------------------------------------------------------
+
+export type UserInsert = Database['public']['Tables']['users']['Insert'];
+export type TaskCategoryInsert = Database['public']['Tables']['task_categories']['Insert'];
+export type TaskRecurrenceInsert = Database['public']['Tables']['task_recurrences']['Insert'];
+export type TaskInsert = Database['public']['Tables']['tasks']['Insert'];
+export type TaskCommentInsert = Database['public']['Tables']['task_comments']['Insert'];
+export type BonusLaunchInsert = Database['public']['Tables']['bonus_launches']['Insert'];
+export type BonusEventInsert = Database['public']['Tables']['bonus_events']['Insert'];
+export type DailyCheckinInsert = Database['public']['Tables']['daily_checkins']['Insert'];
+export type DailyReportInsert = Database['public']['Tables']['daily_reports']['Insert'];
+export type ActivityLogInsert = Database['public']['Tables']['activity_log']['Insert'];
+export type UserAbsenceInsert = Database['public']['Tables']['user_absences']['Insert'];
+export type KpiDefinitionInsert = Database['public']['Tables']['kpi_definitions']['Insert'];
+export type KpiTrackingInsert = Database['public']['Tables']['kpi_tracking']['Insert'];
+export type KpiSubmissionInsert = Database['public']['Tables']['kpi_submissions']['Insert'];
+
+// ---------------------------------------------------------------------------
+// Update types — what .update() accepts
+// ---------------------------------------------------------------------------
+
+export type UserUpdate = Database['public']['Tables']['users']['Update'];
+export type TaskCategoryUpdate = Database['public']['Tables']['task_categories']['Update'];
+export type TaskRecurrenceUpdate = Database['public']['Tables']['task_recurrences']['Update'];
+export type TaskUpdate = Database['public']['Tables']['tasks']['Update'];
+export type TaskCommentUpdate = Database['public']['Tables']['task_comments']['Update'];
+export type BonusLaunchUpdate = Database['public']['Tables']['bonus_launches']['Update'];
+export type BonusEventUpdate = Database['public']['Tables']['bonus_events']['Update'];
+export type DailyCheckinUpdate = Database['public']['Tables']['daily_checkins']['Update'];
+export type DailyReportUpdate = Database['public']['Tables']['daily_reports']['Update'];
+export type ActivityLogUpdate = Database['public']['Tables']['activity_log']['Update'];
+export type UserAbsenceUpdate = Database['public']['Tables']['user_absences']['Update'];
+export type KpiDefinitionUpdate = Database['public']['Tables']['kpi_definitions']['Update'];
+export type KpiTrackingUpdate = Database['public']['Tables']['kpi_tracking']['Update'];
+export type KpiSubmissionUpdate = Database['public']['Tables']['kpi_submissions']['Update'];
+
+// ---------------------------------------------------------------------------
+// KPI Domain Types (Hito 5 — KPI Tracking)
+// ---------------------------------------------------------------------------
+
+export type KpiDataType = 'number' | 'boolean' | 'percentage';
+export type KpiDirection = 'asc' | 'desc';
+export type KpiSubmissionStatus = 'draft' | 'submitted';
+
+/** Per-KPI score result from the scoring engine */
+export interface KpiScore {
+  kpi_id: string;
+  kpi_name: string;
+  earned: number;
+  max_points: number;
 }
 
-export interface TaskCategory {
-  id: string;
-  name: string;
-  color: string;
-  is_default: boolean;
-  created_by: string | null;
-  created_at: string;
+/** Full scoring result for one submission */
+export interface KpiScoringResult {
+  perKpi: KpiScore[];
+  total: number;
+  maxPossible: number;
 }
 
-export interface TaskRecurrence {
-  id: string;
-  title: string;
-  description: string | null;
-  priority: TaskPriority;
-  category_id: string | null;
-  frequency: RecurrenceFrequency;
-  days_of_week: number[];
-  assigned_to: string | null;
-  next_due_date: string | null;
-  is_active: boolean;
-  created_by: string | null;
-  created_at: string;
+/** Tracking entry with its definition attached (for member workspace) */
+export interface KpiTrackingWithDefinition {
+  kpi: KpiDefinition;
+  tracking: KpiTracking | null;
+  score: KpiScore;
 }
 
-export interface Task {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  priority: TaskPriority;
-  assigned_to: string | null;
-  created_by: string | null;
-  due_date: string | null;
-  completed_at: string | null;
-  category_id: string | null;
-  parent_task_id: string | null;
-  is_recurring_instance: boolean;
-  recurrence_id: string | null;
-  attachments: unknown[];
-  created_at: string;
-  updated_at: string;
+/** Submission with nested tracking details (for history view) */
+export interface KpiSubmissionWithDetails {
+  submission: KpiSubmission;
+  entries: KpiTrackingWithDefinition[];
 }
 
-export interface TaskComment {
-  id: string;
-  task_id: string;
+// ---------------------------------------------------------------------------
+// Performance / Dashboard Types (Hito 4)
+// ---------------------------------------------------------------------------
+
+export interface MemberMetrics {
   user_id: string;
-  content: string;
-  created_at: string;
-}
-
-export interface BonusLaunch {
-  id: string;
-  name: string;
-  type: BonusLaunchType;
-  status: BonusLaunchStatus;
-  revenue_bruto: number;
-  margen_neto_pct: number;
-  pool_pct: number;
-  revenue_real: number | null;
-  margen_real_pct: number | null;
-  created_at: string;
-  closed_at: string | null;
-}
-
-export interface BonusEvent {
-  id: string;
-  launch_id: string;
-  user_id: string;
-  event_type: string;
-  points: number;
-  description: string | null;
-  registered_by: string;
-  created_at: string;
-}
-
-export interface DailyReport {
-  id: string;
-  user_id: string;
-  date: string;
-  tasks_completed: unknown[];
-  tasks_pending: unknown[];
-  tasks_overdue: unknown[];
+  user: User;
+  period: { from: string; to: string };
+  tasks_total: number;
+  tasks_completed: number;
+  tasks_completed_on_time: number;
+  tasks_pending: number;
+  tasks_overdue: number;
+  tasks_in_progress: number;
+  tasks_blocked: number;
   completion_pct: number;
+  avg_speed_hours: number | null;
   streak: number;
-  notes: string | null;
-  auto_generated: boolean;
-  created_at: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  user_id: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  metadata: Record<string, unknown>;
-  created_at: string;
-}
-
-export interface UserAbsence {
-  id: string;
-  user_id: string;
-  start_date: string;
-  end_date: string;
-  reason: string | null;
-  created_by: string;
-  created_at: string;
-}
-
-// ---------------------------------------------------------------------------
-// Supabase Database type map (for createClient<Database>())
-// ---------------------------------------------------------------------------
-
-export interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: User;
-        Insert: Omit<User, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<User, 'id'>>;
-        Relationships: [];
-      };
-      task_categories: {
-        Row: TaskCategory;
-        Insert: Omit<TaskCategory, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<TaskCategory, 'id'>>;
-        Relationships: [];
-      };
-      task_recurrences: {
-        Row: TaskRecurrence;
-        Insert: Omit<TaskRecurrence, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<TaskRecurrence, 'id'>>;
-        Relationships: [];
-      };
-      tasks: {
-        Row: Task;
-        Insert: Omit<Task, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
-        Update: Partial<Omit<Task, 'id'>>;
-        Relationships: [];
-      };
-      task_comments: {
-        Row: TaskComment;
-        Insert: Omit<TaskComment, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<TaskComment, 'id'>>;
-        Relationships: [];
-      };
-      bonus_launches: {
-        Row: BonusLaunch;
-        Insert: Omit<BonusLaunch, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<BonusLaunch, 'id'>>;
-        Relationships: [];
-      };
-      bonus_events: {
-        Row: BonusEvent;
-        Insert: Omit<BonusEvent, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<BonusEvent, 'id'>>;
-        Relationships: [];
-      };
-      daily_reports: {
-        Row: DailyReport;
-        Insert: Omit<DailyReport, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<DailyReport, 'id'>>;
-        Relationships: [];
-      };
-      activity_log: {
-        Row: ActivityLog;
-        Insert: Omit<ActivityLog, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<ActivityLog, 'id'>>;
-        Relationships: [];
-      };
-      user_absences: {
-        Row: UserAbsence;
-        Insert: Omit<UserAbsence, 'id' | 'created_at'> & { id?: string; created_at?: string };
-        Update: Partial<Omit<UserAbsence, 'id'>>;
-        Relationships: [];
-      };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
+  tasks_completed_today: number;
+  updated_today: boolean;
+  weekly_data: WeeklyDataPoint[];
+  tasks_list: Task[];
+  block_reasons: Record<string, string>;
+  block_audit: { internal: number; external: number };
+  impact_distribution: { high: number; medium: number; low: number };
+  avg_lead_time_hours: number | null;
+  // Coaching metrics (Phase 4 finale)
+  avg_estimation_gap: number | null; // ((real - estimated) / estimated) * 100
+  fire_ratio: number | null;         // % incendio tasks over completed
+  value_matrix: {
+    key_projects: number;   // high impact + high effort
+    quick_wins: number;     // high impact + low effort
+    maintenance: number;    // low impact + low effort
+    time_sinks: number;     // low impact + high effort
   };
+}
+
+export interface WeeklyDataPoint {
+  date: string;
+  completed: number;
+  assigned: number;
+  completion_pct: number;
+  /** Cumulative scope: tasks created up to and including this day */
+  scope: number;
+  /** Cumulative completed: tasks completed up to and including this day */
+  cumulative_completed: number;
+}
+
+export type DateRangeType = 'day' | 'week' | 'month' | 'custom';
+
+export interface DateFilter {
+  range: DateRangeType;
+  from: string;
+  to: string;
+}
+
+// ---------------------------------------------------------------------------
+// Bonus Simulator Types (Hito 5)
+// ---------------------------------------------------------------------------
+
+/** Input member for the bonus calculator */
+export interface BonusMemberInput {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  role: UserRole;
+  points: number;
+}
+
+/** Single member result from bonus calculation */
+export interface BonusCalculationResult {
+  userId: string;
+  weight: number;
+  rawBonus: number;
+  simulatedBonus: number;
+  poolPercentage: number;
+  isClamped: 'min' | 'max' | false;
+}
+
+/** Full simulation output */
+export interface BonusSimulationOutput {
+  revenue: number;
+  marginPct: number;
+  poolPct: number;
+  netProfit: number;
+  totalPool: number;
+  results: BonusCalculationResult[];
 }

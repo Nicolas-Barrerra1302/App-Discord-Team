@@ -1,5 +1,8 @@
 {
   "mcpServers": {
+    "claude_ai_Canva": {
+      "disabled": true
+    },
     "claude-flow": {
       "command": "cmd",
       "args": [

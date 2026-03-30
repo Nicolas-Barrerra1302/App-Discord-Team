@@ -1,5 +1,5 @@
 -- =============================================================================
--- Mind Fuel Team — Row Level Security Policies
+-- Equipo Nico Barrera — Row Level Security Policies
 -- Run AFTER schema.sql
 -- =============================================================================
 
@@ -48,7 +48,7 @@ $$ language sql security definer stable;
 -- =============================================================================
 create policy "Users: read all"
   on public.users for select
-  using (true);
+  using (get_user_id() IS NOT NULL);
 
 create policy "Users: admin update"
   on public.users for update
@@ -83,20 +83,32 @@ create policy "Tasks: update own or admin"
     or get_user_role() in ('super_admin', 'ceo')
   );
 
-create policy "Tasks: delete admin only"
+create policy "Tasks: delete own or admin"
   on public.tasks for delete
   using (
-    get_user_role() in ('super_admin', 'ceo')
+    assigned_to = get_user_id()
+    or created_by = get_user_id()
+    or get_user_role() in ('super_admin', 'ceo')
   );
 
 -- =============================================================================
 -- TASK_COMMENTS
--- Readable by anyone (the task RLS already limits visibility context).
+-- Readable only if the user has access to the parent task.
 -- Insertable only by the comment author.
 -- =============================================================================
-create policy "Comments: read with task"
+create policy "Comments: read with task access"
   on public.task_comments for select
-  using (true);
+  using (
+    EXISTS (
+      SELECT 1 FROM public.tasks t
+      WHERE t.id = task_id
+        AND (
+          t.assigned_to = get_user_id()
+          OR t.created_by = get_user_id()
+          OR get_user_role() IN ('super_admin', 'ceo')
+        )
+    )
+  );
 
 create policy "Comments: insert authenticated"
   on public.task_comments for insert
@@ -104,44 +116,52 @@ create policy "Comments: insert authenticated"
 
 -- =============================================================================
 -- TASK_RECURRENCES
--- Readable by all (members need to see their recurring assignments).
--- Only admin can create/update/delete.
+-- Readable by all. Any authenticated member can create/update/delete.
 -- =============================================================================
 create policy "Recurrences: read all"
   on public.task_recurrences for select
-  using (true);
+  using (get_user_id() IS NOT NULL);
 
-create policy "Recurrences: admin insert"
+create policy "Recurrences: insert authenticated"
   on public.task_recurrences for insert
-  with check (get_user_role() in ('super_admin', 'ceo'));
+  with check (get_user_id() IS NOT NULL);
 
-create policy "Recurrences: admin update"
+create policy "Recurrences: update own or admin"
   on public.task_recurrences for update
-  using (get_user_role() in ('super_admin', 'ceo'));
+  using (
+    assigned_to = get_user_id()
+    or created_by = get_user_id()
+    or get_user_role() in ('super_admin', 'ceo')
+  );
 
-create policy "Recurrences: admin delete"
+create policy "Recurrences: delete own or admin"
   on public.task_recurrences for delete
-  using (get_user_role() in ('super_admin', 'ceo'));
+  using (
+    assigned_to = get_user_id()
+    or created_by = get_user_id()
+    or get_user_role() in ('super_admin', 'ceo')
+  );
 
 -- =============================================================================
 -- TASK_CATEGORIES
--- Readable by all. Only admin can manage.
+-- Readable by all. Any authenticated user can create/delete.
+-- Only admin can update (rename/recolor).
 -- =============================================================================
 create policy "Categories: read all"
   on public.task_categories for select
-  using (true);
+  using (get_user_id() IS NOT NULL);
 
-create policy "Categories: admin insert"
+create policy "Categories: insert authenticated"
   on public.task_categories for insert
-  with check (get_user_role() in ('super_admin', 'ceo'));
+  with check (get_user_id() IS NOT NULL);
 
 create policy "Categories: admin update"
   on public.task_categories for update
   using (get_user_role() in ('super_admin', 'ceo'));
 
-create policy "Categories: admin delete"
+create policy "Categories: delete authenticated"
   on public.task_categories for delete
-  using (get_user_role() in ('super_admin', 'ceo'));
+  using (get_user_id() IS NOT NULL);
 
 -- =============================================================================
 -- BONUS_LAUNCHES
@@ -150,7 +170,7 @@ create policy "Categories: admin delete"
 -- =============================================================================
 create policy "Launches: read all"
   on public.bonus_launches for select
-  using (true);
+  using (get_user_id() IS NOT NULL);
 
 create policy "Launches: super_admin insert"
   on public.bonus_launches for insert
@@ -192,9 +212,9 @@ create policy "Reports: read own or admin"
     or get_user_role() in ('super_admin', 'ceo')
   );
 
-create policy "Reports: insert"
+create policy "Reports: insert own or super_admin"
   on public.daily_reports for insert
-  with check (true);
+  with check (user_id = get_user_id() OR get_user_role() = 'super_admin');
 
 -- =============================================================================
 -- ACTIVITY_LOG
@@ -205,9 +225,9 @@ create policy "Activity: admin read"
   on public.activity_log for select
   using (get_user_role() in ('super_admin', 'ceo'));
 
-create policy "Activity: insert"
+create policy "Activity: insert own or super_admin"
   on public.activity_log for insert
-  with check (true);
+  with check (user_id = get_user_id() OR get_user_role() = 'super_admin');
 
 -- =============================================================================
 -- USER_ABSENCES
@@ -216,7 +236,7 @@ create policy "Activity: insert"
 -- =============================================================================
 create policy "Absences: read all"
   on public.user_absences for select
-  using (true);
+  using (get_user_id() IS NOT NULL);
 
 create policy "Absences: admin insert"
   on public.user_absences for insert

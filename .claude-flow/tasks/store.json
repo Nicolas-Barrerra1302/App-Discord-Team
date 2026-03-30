@@ -1,0 +1,18 @@
+{
+  "tasks": {
+    "task-1774290807099-vv7l0b": {
+      "taskId": "task-1774290807099-vv7l0b",
+      "type": "implementation",
+      "description": "Implementar performance types, metrics lib, API routes y dashboards UI",
+      "priority": "normal",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [],
+      "createdAt": "2026-03-23T18:33:27.099Z",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}

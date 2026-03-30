@@ -44,11 +44,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated user on the login page — redirect to dashboard
-  if (user && pathname === '/login') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+  // Authenticated user — verify they exist in the whitelist (public.users)
+  if (user && !isApiRoute) {
+    const discordId =
+      user.user_metadata?.provider_id ??
+      user.user_metadata?.sub ??
+      null;
+
+    if (discordId) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('discord_id', discordId)
+        .single();
+
+      if (!dbUser) {
+        // Valid auth session but not in whitelist — destroy session
+        await supabase.auth.signOut();
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        url.searchParams.set('error', 'not_in_whitelist');
+        return NextResponse.redirect(url);
+      }
+    }
+
+    // Authenticated + whitelisted user on /login — redirect to dashboard
+    if (pathname === '/login') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

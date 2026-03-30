@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client';
 const ERROR_MESSAGES: Record<string, string> = {
   unauthorized:
     'Tu cuenta de Discord no esta autorizada. Solo miembros del equipo pueden acceder.',
+  not_in_whitelist:
+    'Tu cuenta de Discord no esta autorizada. Solo miembros del equipo pueden acceder.',
   auth_failed:
     'Hubo un error al iniciar sesion. Por favor, intenta de nuevo.',
 };
@@ -46,14 +48,14 @@ function LoginContent() {
       <div className="rounded-2xl bg-[#1e1e2e] border border-white/[0.06] p-8 shadow-2xl">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#e91e63]/10 mb-4">
-            <span className="text-3xl font-bold text-[#e91e63]">MF</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 mb-4">
+            <span className="text-3xl font-bold text-accent">NB</span>
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            Mind Fuel Team
+            Equipo Nico Barrera
           </h1>
           <p className="mt-2 text-sm text-[#a0a0b0]">
-            Gestion de equipo — Nico Barrera Academy x Mind Fuel
+            Gestion de equipo — Nico Barrera Academy
           </p>
         </div>
 

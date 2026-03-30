@@ -1,7 +1,22 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
+import { evaluateGhostClose } from "@/lib/gamification/ledger-service";
 import type { User } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
+// Ghost Close — Lazy Evaluation (deduplicated per React request tree)
+// Checks if the user forgot to close yesterday's day and inserts a
+// "missed_daily_close" record. Runs once per request, silently fails.
+// ---------------------------------------------------------------------------
+const runGhostCloseOnce = cache(async (userId: string) => {
+  try {
+    await evaluateGhostClose(userId, userId);
+  } catch {
+    // Non-critical: ghost close must never block dashboard rendering
+  }
+});
 
 export default async function DashboardLayout({
   children,
@@ -25,10 +40,17 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
+  // Fire ghost close check — non-blocking, deduplicated per request
+  void runGhostCloseOnce(user.id);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0f0f0f]">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar user={user} />
-      <main className="flex-1 overflow-y-auto p-6 pt-16 lg:p-8 lg:pt-8">
+      <main
+        id="main-content"
+        className="flex-1 overflow-y-auto p-6 pt-16 lg:p-8 lg:pt-8"
+        aria-label="Contenido principal"
+      >
         {children}
       </main>
     </div>

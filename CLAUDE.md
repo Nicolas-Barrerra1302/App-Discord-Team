@@ -1,166 +1,148 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project
 
-## Project Overview
+**Equipo Nico Barrera** — Internal team management app (6 people). Next.js 14 + Supabase + Discord OAuth. Deploy: Vercel.
 
-Internal team management web app for Nico Barrera Academy × Mind Fuel (6-person team). Replaces Trello. Unifies task management, performance tracking, gamified bonus system, and calendar. Team communicates via Discord — the app integrates with Discord for auth and notifications.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14 (App Router) + Tailwind CSS |
-| UI Components | shadcn/ui (dark mode) |
-| Drag & Drop | @dnd-kit/core |
-| Charts | Recharts |
-| Calendar | react-big-calendar or FullCalendar |
-| Database | Supabase (PostgreSQL) |
-| Realtime | Supabase Realtime |
-| Auth | Discord OAuth via Supabase Auth (whitelist only) |
-| Calendar Sync | Google Calendar API (bidirectional) |
-| Deploy | Vercel |
-| Cron Jobs | Vercel Cron + n8n |
-| Notifications | n8n → Discord Bot (Lau) |
-| PWA | next-pwa |
-
-## Build & Dev Commands
+## Commands
 
 ```bash
-npm run dev          # Start dev server (localhost:3000)
-npm run build        # Production build
+npm run dev          # Dev server :3000
+npm run build        # ALWAYS verify before commit
 npm run lint         # ESLint
-npx tsc --noEmit     # Type check without building
+npx tsc --noEmit     # Type check
 ```
 
-## Architecture
+## Env Vars (.env.local)
 
-### App Structure (Next.js App Router)
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `N8N_WEBHOOK_BASE_URL` (optional), `N8N_WEBHOOK_SECRET` (optional)
 
-```
-src/app/
-  (auth)/login/          # Discord OAuth login
-  (auth)/callback/       # OAuth callback
-  (dashboard)/           # Protected layout with sidebar
-    page.tsx             # Personal dashboard (member view)
-    tasks/               # Kanban board + CRUD
-    bonuses/             # Simulator, Register, Ranking tabs
-    calendar/            # Google Calendar sync
-    admin/
-      dashboard/         # Global team metrics
-      member/[id]/       # Individual member drill-down
-      recurrences/       # Recurring task templates
-  api/
-    tasks/               # CRUD endpoints
-    bonuses/             # Launch + events endpoints
-    reports/             # Daily/weekly report generation
-    cron/                # Vercel Cron: generate recurring tasks (6am)
-```
+## Hard Rules
 
-### Key Domains
+1. **Supabase typing** — ALWAYS cast query results. Supabase v2.99+ returns `never`:
+   ```typescript
+   const { data } = await supabase.from('tasks').select('id, title, status') as { data: Pick<Task, 'id'|'title'|'status'>[] | null };
+   const { data } = await supabase.from('tasks').insert(d as never).select().single() as { data: Task | null; error: unknown };
+   ```
+2. **Routes** — Frontend in Spanish (`/tareas`, `/bonos`, `/calendario`). Exception: `/recurrences` (English, dashboard-level). API in English (`/api/tasks`, `/api/bonuses`).
+   - Cron auth: `Bearer CRON_SECRET` (prod) OR `NODE_ENV=development` + `?force=true` (dev bypass).
+3. **Roles** — `super_admin` (Juan David): full access + bonus event registration. `ceo` (Nico): read all, no bonus registration. `member`: own data only + can create/delete own absences.
+4. **RLS** — Always enforced. Use `admin.ts` client only in API routes/cron. Helper functions `get_user_id()` / `get_user_role()` exist in remote Supabase (created via migration 002).
+5. **Dark mode only — "Quiet Luxury + Cyberpunk Neon"** — Carbon Black background (`#0C0C0C`), cards `#141414`/`#1A1A1A`, Copper Gold accent (`#CBA35C`), neon semantic tokens: success-neon `#00E676`, danger-neon `#FF5252`, warning-neon `#FFD740`, electric-blue `#38BFF5`. ALWAYS use semantic Tailwind tokens — never raw hex.
+6. **Icons** — lucide-react exclusively. No shadcn/ui.
+7. **UI language** — Spanish labels throughout.
+8. **UI Single Source of Truth** — NEVER use hardcoded hex colors (e.g., `bg-[#...]`, `text-[#...]`). Always use the semantic Tailwind tokens defined in `tailwind.config.ts` (e.g., `bg-card-secondary`, `text-accent`, `text-success-neon`). UI constants (`STATUS_COLORS`, `PRIORITY_COLORS`, `ROLE_BADGE_COLORS`, `PRIORITY_DOT`, `STATUS_LABELS`, `PRIORITY_LABELS`, `IMPACT_COLORS`, `TASK_TYPE_COLORS`) live in `src/lib/constants.ts` — **NEVER redefine them locally in any component or dashboard file**. ALL new buttons, cards, inputs, and badges MUST use the shared components from `src/components/ui/` (`Card`, `Button`, `Badge`, `Input`). Exception: SVG `stroke`/`fill` attributes and dynamic `style={{}}` with opacity concatenation (e.g., `${color}30`) may keep raw hex.
+   - **Dashboard Composition Rule** — Dashboard pages (`page.tsx`, `admin/page.tsx`, `admin/member/[id]/page.tsx`) act solely as **data fetchers + composition wrappers**. All visual widget logic lives in `src/components/dashboard/shared/` (coaching widgets) or `src/components/dashboard/` (top-level client components). Never inline large JSX blocks that duplicate shared widget logic.
+   - **True Neon LED Rule (Phase 5, 2026-03-29)** — NEVER use muted background opacities (`bg-[neon-token]/10`, `/15`, `/20`) for status badges, gamification figures, task type badges, or alert indicators. Semi-transparent neon fills over Carbon Black produce muddy, desaturated colors. ALWAYS use: `bg-transparent text-[neon-token] border border-[neon-token] [text-shadow:0_0_8px_currentColor]` for text badges; `text-[neon-token] [filter:drop-shadow(0_0_6px_currentColor)]` for SVG icons. Exception: subtle background tints (`/5`) on stat card containers (not the badge itself) are acceptable.
+9. **Colombia timezone (UTC-5)** — ALL server-side date logic MUST use `getTodayColombia()` and `toColombiaDate()` from `src/lib/tasks/dates.ts`. NEVER use `.substring(0, 10)` on `timestamptz` columns (`completed_at`, `created_at`, `updated_at`) — this extracts UTC date, not Colombia date. `.substring(0, 10)` is ONLY safe on DATE columns (e.g., `due_date`). Date range boundaries (`getDayRange`, `getWeekRange`, etc.) use fixed UTC-5 offset for identical behavior on dev (local TZ) and Vercel (UTC).
+26. **KPI deadlines are server-side only** — NEVER compute the KPI submission deadline on the client. ALWAYS use `isBeforeDeadline(weekStart)`, `getDeadlineUtc(weekStart)`, and `getCurrentWeekStart()` from `src/lib/kpis/week-helpers.ts`. The server enforces the Sunday 23:59:59 COT cutoff authoritatively. The client countdown (`deadlineUtc` prop) is display-only and NEVER used to gate writes.
+27. **Eventual Consistency — Activity Log Points** — The DB trigger `trg_task_activity` fires synchronously during task mutations and inserts `activity_log` rows with `impact = NULL` (Migration 019+). The gamification engine runs AFTER the DB commit. `PUT /api/tasks/[id]` backfills the real score (e.g., `+575 pts`) via a `waitUntil` UPDATE using `createAdminClient()` targeting `entity_id = taskId AND entity_type = 'task' AND created_at >= (now − 10s)`. NEVER hardcode a point value in a DB trigger — always backfill from the scoring result in application code.
+28. **Ghost Close — Lazy Evaluation** — `evaluateGhostClose(userId, registeredBy)` in `src/lib/gamification/ledger-service.ts` runs on page load for each user. If no `daily_close`/`missed_daily_close` bonus event exists for yesterday (COT), it: (1) inserts `missed_daily_close` (0 pts) into `bonus_events`, AND (2) upserts `auto_closed = true` into `daily_checkins` with zero metrics + standard summary. Uses `createAdminClient()`. `ignoreDuplicates: true` on the upsert prevents overwriting any real manual check-in that might exist.
 
-1. **Tasks** — Kanban (pending/in_progress/completed/blocked), subtasks, comments, attachments, categories, search + advanced filters, auto-priority escalation near deadlines
-2. **Recurring Tasks** — Admin creates templates with frequency (daily/weekly/biweekly/monthly). Cron generates instances at 6am. Paused for absent members.
-3. **Performance** — Auto-calculated from tasks: % completion, avg speed, streak, overdue count. Admin dashboard with global view + per-member drill-down.
-4. **Bonuses** — Gamified point system per launch. Events (+/-) registered by super_admin only. Pool = revenue × margin% × pool%. Distribution: (base + points) / total, clamped 0.3%–1.5%. Projection mode during launch, real billing on close.
-5. **Calendar** — Bidirectional Google Calendar sync. Tasks with due dates appear as events. Admin sees consolidated team view.
-6. **Notifications** — App exposes API endpoints. n8n calls them on schedule (3pm reminder, 6pm second reminder, 11pm daily report, Sunday weekly summary). Real-time via webhooks for task assignments and overdue alerts.
+## Backend Security Rules (Audit 2026-03-27 + 2026-03-28)
 
-### Roles & Access
+10. **Zero Client Trust** — NEVER accept `user_id`, `registered_by`, or derived metrics from `req.json()` for critical writes. Always derive identity from `getCurrentUser()` (server session). Metrics (hours_worked, fires_handled, etc.) MUST be recalculated server-side from the tasks table — the client only submits human inputs (e.g., `summary`).
+11. **Idempotency First** — Any POST/PUT endpoint handling points, bonuses, or financial data MUST have idempotency guards. Pattern: query for identical record within a 10-second deduplication window before INSERT. Return `409 Conflict` on match. DB UNIQUE constraints are the last line of defense, not the first.
+12. **Timezone Strictness** — NEVER rely on Postgres `CURRENT_DATE` (UTC) for user-facing dates. Always pass `checkin_date: getTodayColombia()` explicitly in INSERTs. Date boundaries for queries use `${today}T00:00:00` / `${today}T23:59:59` with Colombia date. Mixing UTC defaults with Colombia queries creates duplicate-insert windows between 7pm-midnight COT.
+13. **Atomic Multi-table Writes** — When a POST creates a parent + children (e.g., launch + events), failure in child INSERT must rollback the parent via `.delete()` before returning 500. No orphan rows.
+14. **Hard Delete API Guard** — `DELETE /api/tasks/[id]?permanent=true` is gated by `isAdmin(user)` at the API level (not just UI). Members get 403.
+15. **RLS Role Escalation Prevention** — `ceo` UPDATE policy on `users` table uses `WITH CHECK (role = subquery)` to prevent role field mutation. Only `super_admin` has unrestricted UPDATE. Migration 013.
+29. **Zero-Trust Payload Guard (Audit 2026-03-28)** — Every API route that writes to the DB MUST explicitly reject restricted fields with `400 Bad Request` — not silently ignore them. Restricted fields per endpoint: `checkins/today` POST → `hours_worked, fires_handled, blocks_count, completion_pct, user_id, checkin_date`; `kpis/submit` POST → `points, total_points, max_possible, score, user_id, submitted_at, status, bonus_event_id`; `tasks/[id]` PUT → `completed_at, created_at, updated_at, created_by, id`; `bonuses/events` POST → `registered_by, created_at, id, updated_at`. Pattern: `const prohibited = PROHIBITED_FIELDS.filter(f => f in body); if (prohibited.length > 0) return NextResponse.json({ error: '...' }, { status: 400 })`. Silently ignoring injected fields is NOT sufficient — the endpoint must loudly reject them.
+30. **Gamification Dedup by Transaction ID (Audit 2026-03-28)** — NEVER deduplicate `bonus_events` by point value (`.eq('points', score)`). Points are not unique identifiers — two different tasks can score the same points, causing false-positive dedup. ALWAYS use the transaction's unique business identifier: `task_completed` → `.filter('metadata->>task_id', 'eq', taskData.taskId)`; `kpi_weekly` → date range covering the full COT week (`week_start T05:00:00Z` to `week_start+7d T05:00:00Z`), not a 10-second window. A 10-second window for weekly KPI submission is insufficient — two concurrent requests both pass before either writes.
+31. **Manual-Only Bonus Event Registration (Audit 2026-03-28)** — `POST /api/bonuses/events` ONLY accepts `MANUAL_REGISTRATION_EVENT_TYPES = ['quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment']`. Automated gamification event types (`task_completed`, `kpi_weekly`, `streak`, `daily_close`, `missed_daily_close`, `settlement`) are STRICTLY PROHIBITED at this endpoint. Any request with an automated event_type returns `400 Bad Request`. Automated events are written exclusively by server-side gamification systems (`ledger-service.ts`, `PUT /api/tasks/[id]`, `POST /api/kpis/submit`). This separation prevents manual injection of points that should only come from verified task/KPI completion.
 
-| Role | Access |
-|------|--------|
-| `super_admin` (Juan David V.) | Full access. Only role that can register bonus events. |
-| `ceo` (Nico Barrera) | Read access to all dashboards/bonuses. Cannot register bonus events. |
-| `member` | Own tasks, own performance, own bonus position, own calendar. |
+## Database Performance Rules (Audit 2026-03-27)
 
-Auth uses Discord OAuth with a whitelist — only 6 approved Discord IDs can log in.
+16. **Zero Over-fetching** — NEVER use `select('*')` in production queries. Always explicitly define the exact columns needed (e.g., `select('id, title, status')`). Exception: `.insert(...).select().single()` on write-then-return is acceptable (returns the just-written row). Metrics use `TASK_METRICS_COLS` constant (17 columns, excludes `description`, `attachments` JSONB).
+17. **N+1 Prevention** — NEVER place Supabase database queries inside `for` loops or `.map()` iterations. Always pre-fetch in bulk (`.in()` or single query) and filter in memory. Pattern: batch query → `Set`/`Map` → O(1) lookup inside loop. CRON uses `alreadyGenerated: Set<string>` pre-fetched before the recurrence loop.
+18. **B-Tree Indexes** — Migration 014 enforces indexes on frequently filtered columns: `tasks(assigned_to)`, `tasks(assigned_to, status)`, `tasks(due_date)`, `tasks(completed_at)`, `tasks(created_at)`, `tasks(recurrence_id, created_at)`, `tasks(status)`, `tasks(parent_task_id)`, `activity_log(user_id, created_at DESC)`, `bonus_events(launch_id)`, `task_comments(task_id, created_at DESC)`. Any new column used in `.eq()`/`.gte()`/`.order()` on tables with >100 rows MUST have an index.
+19. **Bounded Historical Queries** — Admin dashboard check-ins use 30-day temporal window (`.gte("checkin_date", thirtyDaysAgo)`). Never fetch unbounded historical data to send to the client. HEAD-only count queries use `select('id', { count: 'exact', head: true })` (not `select('*')`).
 
-### Database Schema (Supabase)
+## Conventions
 
-Core tables: `users`, `tasks`, `task_comments`, `task_recurrences`, `task_categories`, `bonus_launches`, `bonus_events`, `daily_reports`, `activity_log`, `user_absences`
+- File org: `/src` (code), `/supabase` (SQL), `/docs` (docs), `/public` (assets)
+- SQL run order: `schema.sql` -> `seed.sql` -> `rls.sql`
+- API access: verify `!isAdmin(user) && entity.assigned_to !== user.id`. Sanitize search inputs before PostgREST `.or()`.
+- Activity logging: `waitUntil(logActivity(...))` from `@vercel/functions`. Additionally, a PL/pgSQL trigger (`trg_task_activity`) auto-inserts into `activity_log` on task status/due_date changes — uses `NEW.assigned_to` (never `auth.uid()`, which is an `auth.users` UUID not present in `public.users`). Trigger logs "Cambió el estado de [Old] a [New]" with Spanish labels and captures `block_reason` when status=blocked. NULL-safe via CASE statements (not jsonb `->>`).
+- **Activity Log Timeline** — `ActivityLogFeed` (`src/components/shared/ActivityLogFeed.tsx`) is the single UI component for activity display. Hybrid pagination: server sends first 20 items via `initialLogs` prop, client manages "Cargar más" via `/api/activity` endpoint. Supports `userIdsFilter?: string[]` prop with `useEffect` + `AbortController` for reactive admin multi-select filtering. `TaskHistoryTable` (`src/components/shared/TaskHistoryTable.tsx`) follows identical pattern for task history in member detail.
+- No client-side filtering — all filtering in DB via PostgREST. **Exception:** Performance metrics do 100% filtering in JS (strict timebox logic requires hybrid date rules that PostgREST can't express cleanly).
+- **Supabase DATE columns** return `"YYYY-MM-DDT00:00:00+00:00"`, NOT `"YYYY-MM-DD"`. Always `.substring(0, 10)` before string comparison. In frontend, parse as local date (`new Date(y, m-1, d)`) to avoid UTC-5 shift.
+- **API filter sanitization** — `"all"`, `"Todas"`, `"Todos"` query params must be converted to `undefined` before applying `.eq()`. Otherwise null-field tasks get excluded.
+- **Hydration safety** — No `let` mutable variables at module level in `'use client'` components (breaks Fast Refresh). Use `useRef` for counters/IDs. Add `suppressHydrationWarning` on elements rendering locale-formatted dates (`toLocaleDateString`). Pass server-computed dates (e.g. `serverToday`) as props instead of calling `new Date()` in render bodies.
+- **No `tailwindcss-animate`** — Don't use `animate-in`, `slide-in-from-*` classes (plugin not installed). Use plain Tailwind transitions.
+- **dnd-kit multi-container** — Kanban uses custom `columnAwareCollision` detection: `pointerWithin` for column droppables first, fallback to `closestCorners`. This prevents empty columns from being skipped when adjacent columns have task cards (compact droppables win over large empty ones in `closestCorners`). Column droppable `ref` must be on the outer div (not inner task list). `handleDragEnd` resolves `over.id` via `resolveDropColumn()` (handles task UUID → parent column status). Module-level `VALID_STATUSES` guards all resolved values before API calls.
 
-RLS enforced: members see only their own data. Admin/CEO see all.
+## React Performance Rules (Audit 2026-03-27 + 2026-03-29)
 
-SQL definitions in `supabase/schema.sql` (DDL), `supabase/seed.sql` (initial data), `supabase/rls.sql` (policies). Run these in Supabase SQL Editor in order.
+20. **Strict Memoization** — Any component rendered inside a list or array `.map()` (e.g., `TaskCard` inside `KanbanColumn`) MUST be wrapped in `React.memo`. Use a custom comparison function comparing only visually-relevant scalar fields (`id`, `status`, `updated_at`, `title`, `priority`, `due_date`) instead of deep/shallow comparing the entire props object. Never pass `() => {}` as onClick to memoized components (creates new ref each render).
+21. **Reference Equality** — NEVER filter, sort, or derive arrays directly inside the render body or JSX. Always wrap derived state in `useMemo` with the correct dependency array. Pattern: `const columnTasks = useMemo(() => { ... return map; }, [tasks, sortMode])`. This ensures child `React.memo` components receive stable array references.
+22. **Stable Handlers** — Any function passed as a prop to a child component MUST be wrapped in `useCallback`. This includes event handlers (`onClick`, `onDelete`, `onArchived`), modal callbacks (`onClose`, `onSaved`), and state setters passed as props. Without `useCallback`, new function references on every render break child `React.memo` — the memoization becomes useless.
+33. **Kanban Structural Comparators (Audit 2026-03-29)** — When a parent `useMemo` builds a new `Record<key, Item[]>` map on every recompute (as `columnTasks` does), all 4 column arrays get new references even if their contents are unchanged. A reference-equality comparator on `KanbanColumn` would cause ALL 4 columns to re-render on every drag. The fix is a **structural comparator** that iterates `prev.tasks` vs `next.tasks` comparing `id + status + updated_at` per item — re-rendering only the 2 columns whose task lists actually changed. Additionally, `SortableContext items` MUST be derived via `useMemo(() => tasks.map(t => t.id), [tasks])` inside the column — passing an inline `.map()` creates a new array on every column render, invalidating `SortableContext`'s internal optimization. Custom comparators must include ALL fields that affect the rendered output; missing `subtask_count`/`subtask_completed_count` silently breaks subtask progress bars.
+34. **Parallel Server Data Fetching** — Independent Supabase queries in Server Components MUST be dispatched with `Promise.all`. Sequential `await` chains serialize queries whose total latency is the sum of all. `Promise.all` reduces it to the slowest single query. Apply to: `page.tsx` (metrics + activity log), `admin/page.tsx` (allUsers + metrics + activity log + checkins). Exception: queries where query B depends on the result of query A (e.g., `getCurrentUser()` must resolve before user-scoped queries).
+35. **Suspense + Skeleton for Heavy Data Components (Phase 6 — 2026-03-29)** — Any new async Server Component that fetches heavy data (metrics, activity logs, team overview) MUST be wrapped in `<Suspense fallback={<Skeleton />}>` in its parent page. The page shell (auth check, header, stat cards) MUST render immediately without waiting for secondary data. Pattern: create a dedicated async Server Component for the heavy section, pass it as a slot prop to the client component so the client component renders instantly while the slot streams in. The global `(dashboard)/loading.tsx` skeleton handles route-level transitions; granular in-page Suspense handles section-level streaming.
+36. **Structured Logging in Background Processes (Phase 7 — 2026-03-29)** — NEVER write naked `console.error()` or `console.log()` in background processes (cron routes, `ledger-service.ts`, `dispatcher.ts`, any `waitUntil()` side-effect). ALWAYS use a structured log line with an explicit grep-able prefix and key=value context fields. Required prefixes: `[CRON]` / `[CRON_ERROR]` / `[CRON_SUMMARY]` in cron routes; `[WEBHOOK_ERROR]` in dispatcher; `[LEDGER_ERROR]` / `[LEDGER_WARN]` in ledger-service. ALWAYS include `user_id`, `task_id` / `recurrence_id`, and `event_type` where applicable. This ensures every production failure is searchable by entity in Vercel Logs. See `docs/ARCHITECTURE.md — Observability & Structured Logging` for full spec.
 
-### Key Lib Files
+## Async Resilience Rules (Audit 2026-03-27)
 
-- `src/lib/types.ts` — All TypeScript interfaces + `Database` type map for Supabase client generics
-- `src/lib/constants.ts` — Roles, statuses, priorities, nav items, bonus config, default categories
-- `src/lib/supabase/database.ts` — Helpers: `getCurrentUser()`, `isAdmin()`, `isSuperAdmin()`, `logActivity()`
-- `src/lib/supabase/client.ts` — Browser client (use in `"use client"` components)
-- `src/lib/supabase/server.ts` — Server client (use in Server Components, route handlers)
-- `src/lib/supabase/admin.ts` — Service role client (bypasses RLS, use in API routes/cron only)
-
-### Notification Architecture
-
-```
-App (Next.js API) ←→ n8n workflows ←→ Discord Bot (Lau)
-```
-- n8n handles all scheduling (cron) and Discord message delivery
-- App provides data endpoints, n8n orchestrates communication
-- No separate discord.js bot server needed
-
-## Design System
-
-- **Dark mode only** — professional enterprise look (Notion dark aesthetic)
-- Palette: background `#0f0f0f`/`#1a1a2e`, cards `#16213e`/`#1e1e2e`, accent pink/red `#e91e63`, success green `#00e676`, text `#e0e0e0`
-- Mobile-first responsive. PWA installable.
-- Loading: skeleton screens. Errors: clear messages, never white screens. Empty states: friendly messages.
+23. **Never Block API Responses with External HTTP** — NEVER `await fetch(externalUrl)` inline in a Next.js API route handler before returning the response. External services (n8n webhooks, Discord API, third-party APIs) can be slow or down. A 15-second n8n delay causes a Vercel 504 timeout, which triggers false Kanban rollbacks (DB committed but frontend reverts). All external HTTP calls MUST go through the Webhook Dispatcher.
+24. **Webhook Dispatcher Pattern** — All outbound webhook calls MUST use `src/lib/webhooks/dispatcher.ts`. Pattern: `waitUntil(notifyTaskCompleted(task, user))` — identical to the existing `waitUntil(logActivity(...))` pattern. The dispatcher enforces: (a) `AbortController` with 5-second timeout, (b) `try/catch` that swallows errors with `console.warn` (never throws), (c) graceful degradation when `N8N_WEBHOOK_BASE_URL` is not set (dev mode). Typed helpers: `notifyTaskCompleted()`, `notifyTaskAssigned()`, `notifyBonusEvent()`, `notifyCheckinSaved()`.
+25. **Side-effect Ordering** — In API routes, the execution order is always: (1) Auth + validation, (2) Supabase mutation (commit to DB), (3) `waitUntil(logActivity(...))`, (4) `waitUntil(notifyXxx(...))`, (5) `return NextResponse.json(...)`. The response is sent BEFORE webhooks execute. DB state is always the source of truth.
 
 ## Behavioral Rules
 
-- Do what has been asked; nothing more, nothing less
-- NEVER create files unless absolutely necessary — prefer editing existing
-- NEVER proactively create documentation files unless explicitly requested
-- NEVER save working files, text/mds, or tests to the root folder
+- Do what was asked; nothing more, nothing less
+- NEVER create files unless absolutely necessary
 - ALWAYS read a file before editing it
-- NEVER commit secrets, credentials, or .env files
-- ALWAYS run tests after making code changes
-- ALWAYS verify build succeeds before committing
+- ALWAYS verify build before committing
+- **Ejecución Directa: Trabaja como un desarrollador Senior en solitario. Edita los archivos directamente usando tus herramientas nativas de lectura, escritura y bash. NO uses enjambres, NO delegues tareas en procesos de background, NO uses CLI de agentes externos. Tú analizas, tú editas tu propio código, tú verificas.**
 
-## File Organization
+## Business Logic Rules
 
-- `/src` — source code (Next.js App Router)
-- `/supabase` — SQL schema, seed data, RLS policies
-- `/docs` — project plans and documentation
-- `/public` — static assets, PWA manifest, icons
+- **Blocked tasks freeze KPIs** — `status === 'blocked'` tasks are excluded from `tasks_overdue`, don't penalize `completion_pct`, and don't break `streak`.
+- **Block requires reason** — Moving a task to "blocked" (drag & drop or form) triggers a mandatory modal: block type (Interno/Externo) + text reason. Reason is saved as a `task_comments` entry AND in `block_type`/`block_reason` columns on the task row.
+- **Estimation + Impact mandatory** — `impact` (high/medium/low) and `estimated_time` (minutes, entered as hours in UI) are required fields on task creation/edit. API validates both. DB columns are nullable for backward compat with existing tasks.
+- **Hard delete admin-only** — Members see only "Archivar" on TaskCard. "Eliminar definitivo" is restricted to `super_admin`/`ceo`.
+- **Categories** — Any authenticated user can create/delete custom categories. Default categories (`is_default=true`) are protected. Delete blocked if active (non-archived) tasks use the category; archived tasks get unlinked before delete.
+- **Recurrences** — All members manage own recurring tasks via `/recurrences` (dashboard-level, role-filtered). Admins see all. Admin-only view at `/admin/recurrences` still exists for full control.
+- **Absences** — Admins create for anyone; members create only for themselves (backend forces own ID). Delete: admin any, member own only.
+- **Toast feedback** — Category delete shows toast VERDE (success) or ROJO (error with API message) in both task and recurrence modals.
+- **Cron dev button** — "Forzar Cron (Dev)" only visible in `development` AND only for `super_admin`/`ceo`. Sends `POST ?force=true` which bypasses auth + schedule + duplicate checks. Absences always enforced.
+- **Metrics strict timebox** — Completed: `completed_at` in `[FROM, TO]`. Non-completed: `due_date` in `[FROM, TO]` (no backlog bleed); if no `due_date`, fall back to `created_at` in `[FROM, TO]`. `getWeekRange()` spans Mon-Sun (not Mon-today). `getMonthRange()` spans 1st through last day of month. Performance API routes use `force-dynamic`.
+- **isOverdue** — Compares `YYYY-MM-DD` strings only (no timestamps). Today is NOT overdue, only past dates. Excludes `completed` and `blocked` tasks. Single source of truth: `src/lib/tasks/filters.ts`. All dashboard drill-down tables use this function.
+- **Admin multi-select** — `AdminMultiSelect` component uses `window.history.replaceState` (not `router.replace`) to update `?users=id1,id2` without server re-render. Server component passes immutable `allUsers` list (always all active users) separate from filtered `metrics`.
+- **API status validation** — `PUT /api/tasks/[id]` validates `status` against `VALID_STATUSES` array before updating. Prevents check constraint violations (error 23514) from invalid status strings (e.g. Spanish labels instead of enum IDs).
+- **Audit widgets** — Admin team overview (`TeamOverview`) includes 3 audit widgets: Block Audit (internal vs external stacked bar), Avg Lead Time (completed_at - created_at), Impact Distribution (conic-gradient pie). All clickable — filter drill-down table via extended `DrillDownKey`.
+- **Coaching metrics** — Member detail includes 3 visual coaching widgets: (1) Estimation Precision Gauge (SVG semicircle, -50% to +50%), (2) Operational Stress Bar (fire_ratio with 3-zone gradient: blue/orange/red), (3) Value Matrix 2×2 quadrant (impact × effort with bubble sizing). Calculations in `calculateMemberMetrics()`: `avg_estimation_gap`, `fire_ratio`, `value_matrix`.
+- **Personal Dashboard "Modo Enfoque"** — `PersonalDashboard` layout: (1) Hero with top 2 tasks by `impact×10 + priority` score, (2) 4 stat cards with drill-down table, (3) 4-col health grid: completion ring + cognitive load tachometer (SVG, zones 1-3/4-6/7+) + estimation gauge + stress bar, (4) value matrix 2×2 + ActivityLogFeed. Coaching widgets (gauge, stress, matrix) ported from member-detail — same logic, not extracted into shared components.
+- **Burn-Up Chart** — Member detail replaces bar chart with AreaChart. Scope line = cumulative tasks by `due_date` (fallback `created_at`). Completed line = cumulative by `completed_at`. Historical tasks (due_date before range) included in base. Future days (> today) hold flat. `buildWeeklyData()` receives `ownTasks` (all user tasks) + `allTasks` (timeboxed).
+- **Daily Check-in ("Cierre de Día")** — Table `daily_checkins` (migration 009 + 010). `GET/POST /api/checkins/today` auto-calculates hours_worked (sum time_spent), fires_handled (incendio count), blocks_count, completion_pct (completed/total). Admin client bypasses RLS for both read/write (RLS SELECT policy doesn't resolve correctly with anon client). POST is **zero-trust**: accepts ONLY `summary` from client body (max 2000 chars), recalculates all metrics server-side. INSERT passes `checkin_date: getTodayColombia()` explicitly (never relies on Postgres `DEFAULT CURRENT_DATE` which is UTC). `DailyCheckinModal` shows completion ring SVG + read-only metrics + mandatory summary textarea. PersonalDashboard shows "Cerrar Día" button or "Día Cerrado" badge. Admin sees `AdminCheckinsWidget` in TeamOverview — client-side `useMemo` filters `rawCheckins` by active `dateRange` (not server searchParams). Fetch uses `cache: "no-store"`.
 
-## Concurrency Rules
+## Progress
 
-- All related operations MUST be parallel in a single message
-- ALWAYS batch ALL todos in ONE TodoWrite call
-- ALWAYS batch ALL file reads/writes/edits in ONE message
-- ALWAYS batch ALL Bash commands in ONE message
+| Hito | Estado |
+|------|--------|
+| 1-4 | DONE (auth, tasks, recurrences, performance). Hito 4 hardened: strict timebox, isOverdue, multi-select, Activity Log Timeline, Coaching metrics, Burn-Up Chart, Personal Dashboard "Modo Enfoque", Daily Check-in ("Cierre de Día") con modal + admin widget + completion ring SVG. UI Design System (`src/components/ui/`): Card, Button, Badge, Input — applied across all 3 dashboards. Colombia timezone fix (all metrics use `toColombiaDate()` instead of UTC `.substring(0,10)`) |
+| 5. Bonos | 9/10 (falta cross-launch chart -> Hito 8) |
+| 5.5 Ajustes operativos | DONE (KPI freeze, block modal, recurrences UX, category delete, hard delete restriction, toast feedback, cron dev-only, RLS migration 002, absence permissions, cron force mode, advanced category delete) |
+| 5.6 KPI Tracking & Gamification Engine | DONE (migration 015: kpi_definitions + kpi_tracking + kpi_submissions + RLS. Scoring engine asc/desc direction. COT deadline enforcement. Admin /admin/kpis: create/toggle/delete KPIs, week navigation, member tracking table. Member /kpis: draft save, live score preview, submit lock, bonus_event integration, ActivityLogFeed) |
+| 6. Metricas Auditoria | DONE (estimated_time, impact, block_type/block_reason columns + 3 audit widgets + drill-down interactivo) |
+| 6.5 Security Audit & Hardening | DONE (RLS migration 013: role escalation fix, tasks INSERT tightened, absences self-service. API: hard delete guard, checkins zero-trust + timezone fix, bonus events idempotency, launch atomic rollback) |
+| 6.6 DB Performance Audit | DONE (Migration 014: 11 B-Tree indexes. Kill `select('*')` → explicit columns. Kill CRON N+1 → batch pre-fetch Set. Bounded admin checkins 30d window) |
+| 6.7 React Performance Audit | DONE (Kanban memoization: `React.memo` on TaskCard/KanbanColumn, `useMemo` columnTasks, `useCallback` all handlers. Re-render cascade eliminated) |
+| 6.8 Async Resilience Audit | DONE (Webhook Dispatcher: `src/lib/webhooks/dispatcher.ts` — `waitUntil` + `AbortController` 5s timeout + error swallowing. Integrated in `PUT /api/tasks/[id]` for task-completed and task-assigned events. Ready for Hito 8 n8n integration) |
+| 6.10 Zero-Trust & Concurrency Audit | DONE (400 Bad Request guards on all 4 write paths. `kpi_weekly` dedup expanded to full 7-day COT week. `task_completed` dedup by `metadata->>task_id` not `points`. `checkins/today` pre-check before metric queries. Rules 29 + 30 codified) |
+| 6.11 DB Integrity Audit | DONE (Migration 021: 4 B-Tree indexes standalone para week_start/event_type/checkin_date. RLS hardening: kpi_submissions WITH CHECK status='draft', kpi_tracking freeze guard post-submit. FK ON DELETE CASCADE/SET NULL) |
+| 6.12 Zero-Trust API Hardening II | DONE (MANUAL_REGISTRATION_EVENT_TYPES allowlist en bonuses/events. kpi_id ownership validation. Number.isFinite() todos los numéricos. Bounds en description/title/block_reason. Rule 31 codificada) |
+| Phase 5 — Design System & Decomposition | DONE (2026-03-29): 900+ hex hardcodes purged across tasks/kanban/bonus components. All UI tokens → `tailwind.config.ts` semantic classes. `src/components/ui/` (Button/Badge/Input/Card) enforced everywhere. Monolithic dashboards decomposed: `personal-dashboard.tsx` 950→658 lines, `member-detail.tsx` 914→530 lines. 4 shared coaching widgets extracted to `src/components/dashboard/shared/`: `EstimationGauge`, `StressBar`, `ValueMatrix`, `DrillDownTable`. `PRIORITY_DOT` + `formatDateShort` centralized to `constants.ts` / `dashboard/utils.tsx`. Zero TypeScript errors post-refactor. |
+| Phase 6 — Progressive Hydration & Streaming | DONE (2026-03-29): `(dashboard)/loading.tsx` rewritten as high-fidelity skeleton (hero + 4 stat cards + health grid + activity row) using semantic tokens + `animate-pulse`. `page.tsx` splits metrics and activity log: `PersonalActivityLog` async Server Component streams in via `<Suspense>` + dedicated `ActivityLogSkeleton`. `admin/page.tsx` extracts `AdminDashboardSection` async Server Component behind `<Suspense>` — auth guard runs immediately, heavy data streams separately. `PersonalDashboard` gains `activityLogSlot?: React.ReactNode` slot prop. ARIA: `Button` gets `aria-busy` + spinner `aria-hidden` + `sr-only` text; `DrillDownTable` close button gets `aria-label` + table `scope="col"` headers; layout `<main>` gets `aria-label`. Rules 35 codificada. |
+| Phase 7 — Structured Observability Logging | DONE (2026-03-29): All background processes upgraded to grep-able structured logs. `[CRON_ERROR]` / `[CRON_SUMMARY]` in `generate-tasks/route.ts` with full `recurrence_id`, `assigned_to`, key=value summary line. `[WEBHOOK_ERROR]` in `dispatcher.ts` distinguishes TIMEOUT vs NETWORK_ERROR, surfaces payload keys without dumping full objects. `[LEDGER_ERROR]` / `[LEDGER_WARN]` in `ledger-service.ts` include `user_id`, `task_id`, `event_type`, `launch_id`, score on every failure. No naked `console.error()` remains in any background process. Rule 36 codificada. Enterprise Audit Phases 1–7 complete. |
+| 7. Refinamiento & Dashboards | Pending (Fix RLS Bonus Ranking, Refactor Bonus Projection UI, Check-in penalty logic) |
+| 8. Calendario | Pending |
+| 9. Notificaciones | Pending |
+| 10. Polish + Deploy | Pending |
 
-## Swarm Orchestration (Ruflo V3)
+## Reference Docs
 
-- Use hierarchical topology for coding swarms, max 6-8 agents
-- Use specialized strategy for clear role boundaries
-- ALWAYS use `run_in_background: true` for agent Task calls
-- After spawning agents, STOP — do NOT poll or check status
-- When results arrive, review ALL before proceeding
-
-```bash
-npx ruflo@latest swarm init --topology hierarchical --max-agents 8 --strategy specialized
-npx ruflo@latest doctor --fix
-```
-
-### 3-Tier Model Routing
-
-| Tier | Handler | Use Cases |
-|------|---------|-----------|
-| 1 | Agent Booster (WASM) | Simple transforms — skip LLM |
-| 2 | Haiku | Simple tasks, low complexity (<30%) |
-| 3 | Sonnet/Opus | Complex reasoning, architecture (>30%) |
-
-## MCP Servers
-
-- `claude-flow` — Ruflo V3 orchestration (swarm, memory, agents, hooks)
-- `claude-mem` — Persistent memory across sessions
-
-## Support
-
-- Ruflo: https://github.com/ruvnet/claude-flow
-- Issues: https://github.com/ruvnet/claude-flow/issues
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — App structure, routes, lib files, DB schema, design tokens, notification flow
+- [docs/DOMAIN_MODULES.md](docs/DOMAIN_MODULES.md) — Detailed architecture per module (tasks, recurrences, performance, bonuses)
+- [docs/PHASE_1_PLAN.md](docs/PHASE_1_PLAN.md) — Plan de vuelo: progreso, mejoras sugeridas, anotaciones clave por hito, plan de ejecucion pendiente

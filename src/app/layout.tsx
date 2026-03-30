@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Mind Fuel Team",
-  description: "Gestión de equipo — Nico Barrera Academy × Mind Fuel",
+  title: "Equipo Nico Barrera",
+  description: "Gestión de equipo — Nico Barrera Academy",
   manifest: "/manifest.json",
 };
 

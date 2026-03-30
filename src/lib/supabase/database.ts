@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, User, UserRole } from '@/lib/types';
+import type { Database, Json, User, UserRole } from '@/lib/types';
 
 type TypedClient = SupabaseClient<Database>;
 
@@ -62,6 +62,14 @@ interface LogActivityParams {
   entityType: string;
   entityId?: string | null;
   metadata?: Record<string, unknown>;
+  /**
+   * Display name for the ActivityLogFeed timeline.
+   * ActivityLogFeed filters WHERE target_name IS NOT NULL — entries without
+   * this field are stored but not shown in the UI timeline.
+   */
+  targetName?: string | null;
+  /** 'positive' | 'negative' | 'neutral' — drives color coding in the feed */
+  impact?: string | null;
 }
 
 /**
@@ -72,13 +80,15 @@ export async function logActivity(
   supabase: TypedClient,
   params: LogActivityParams
 ): Promise<void> {
-  const { userId, action, entityType, entityId, metadata } = params;
+  const { userId, action, entityType, entityId, metadata, targetName, impact } = params;
 
   await supabase.from('activity_log').insert({
     user_id: userId,
     action,
     entity_type: entityType,
     entity_id: entityId ?? null,
-    metadata: metadata ?? {},
-  } as never);
+    metadata: (metadata ?? {}) as Json,
+    target_name: targetName ?? null,
+    impact: impact ?? null,
+  });
 }
