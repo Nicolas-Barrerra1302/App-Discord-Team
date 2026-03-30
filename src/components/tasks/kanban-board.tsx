@@ -380,6 +380,7 @@ export function KanbanBoard({
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialMount = useRef(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const showToast = useCallback((type: "success" | "error", message: string) => {
     setToastMsg({ type, text: message });
@@ -723,7 +724,7 @@ export function KanbanBoard({
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 overflow-x-hidden">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">
@@ -751,11 +752,18 @@ export function KanbanBoard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
-        autoScroll={{ acceleration: 2, threshold: { x: 0.2, y: 0.05 } }}
+        autoScroll={{
+          acceleration: 2,
+          threshold: { x: 0.2, y: 0.05 },
+          ...(scrollContainerRef.current
+            ? { scrollableAncestors: [scrollContainerRef.current] }
+            : {}),
+        }}
       >
         <div
+          ref={scrollContainerRef}
           className={cn(
-            "flex flex-nowrap gap-4 overflow-x-auto pb-4 transition-opacity md:snap-none",
+            "flex w-full flex-nowrap gap-4 overflow-x-auto pb-4 pr-4 transition-opacity md:snap-none",
             isDragging ? "snap-none" : "snap-x snap-mandatory",
             loading && "opacity-60"
           )}
