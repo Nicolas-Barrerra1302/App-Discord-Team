@@ -364,6 +364,7 @@ export function KanbanBoard({
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("default");
+  const [isDragging, setIsDragging] = useState(false);
 
   // Time-spent modal state
   const [timeTask, setTimeTask] = useState<{
@@ -468,6 +469,7 @@ export function KanbanBoard({
     (event: DragStartEvent) => {
       const task = tasks.find((t) => t.id === event.active.id);
       setActiveTask(task ?? null);
+      setIsDragging(true);
     },
     [tasks]
   );
@@ -536,9 +538,15 @@ export function KanbanBoard({
     [tasks]
   );
 
+  const handleDragCancel = useCallback(() => {
+    setActiveTask(null);
+    setIsDragging(false);
+  }, []);
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveTask(null);
+      setIsDragging(false);
       const { active, over } = event;
       if (!over) return;
 
@@ -742,10 +750,13 @@ export function KanbanBoard({
         collisionDetection={columnAwareCollision}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        autoScroll={{ acceleration: 2, threshold: { x: 0.2, y: 0.05 } }}
       >
         <div
           className={cn(
-            "flex flex-nowrap gap-4 overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none transition-opacity",
+            "flex flex-nowrap gap-4 overflow-x-auto pb-4 transition-opacity md:snap-none",
+            isDragging ? "snap-none" : "snap-x snap-mandatory",
             loading && "opacity-60"
           )}
         >
