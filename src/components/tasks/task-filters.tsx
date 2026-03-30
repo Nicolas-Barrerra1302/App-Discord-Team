@@ -109,10 +109,10 @@ export function TaskFiltersPanel({
       <div
         className={cn(
           "overflow-hidden transition-all duration-200",
-          open ? "mt-3 max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+          open ? "mt-3 max-h-[75vh] opacity-100" : "max-h-0 opacity-0"
         )}
       >
-        <div className="rounded-xl border border-white/5 bg-card/50 p-4 space-y-4">
+        <div className="max-h-[75vh] overflow-y-auto overscroll-contain rounded-xl border border-white/5 bg-card/50 p-4 pb-6 space-y-4">
           {/* Status pills */}
           <div>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-muted">
