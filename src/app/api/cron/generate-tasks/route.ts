@@ -172,6 +172,9 @@ export async function POST(request: NextRequest) {
         is_recurring_instance: true,
         recurrence_id: recurrence.id,
         attachments: [],
+        impact: recurrence.impact ?? null,
+        estimated_time: recurrence.estimated_time ?? null,
+        task_type: recurrence.task_type,
       };
 
       const { data: newTask, error: insertError } = await supabase

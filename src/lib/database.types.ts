@@ -515,6 +515,8 @@ export type Database = {
           task_type: "planeada" | "incendio"
           default_status: "pending" | "in_progress" | "completed" | "blocked"
           attachments: Json[]
+          impact: "high" | "medium" | "low" | null
+          estimated_time: number | null
         }
         Insert: {
           id?: string
@@ -532,6 +534,8 @@ export type Database = {
           task_type?: "planeada" | "incendio"
           default_status?: "pending" | "in_progress" | "completed" | "blocked"
           attachments?: Json[]
+          impact?: "high" | "medium" | "low" | null
+          estimated_time?: number | null
         }
         Update: {
           id?: string
@@ -549,6 +553,8 @@ export type Database = {
           task_type?: "planeada" | "incendio"
           default_status?: "pending" | "in_progress" | "completed" | "blocked"
           attachments?: Json[]
+          impact?: "high" | "medium" | "low" | null
+          estimated_time?: number | null
         }
         Relationships: [
           {

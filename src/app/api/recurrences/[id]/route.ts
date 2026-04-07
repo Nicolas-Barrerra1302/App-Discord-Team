@@ -86,12 +86,13 @@ export async function PUT(
   const {
     title, description, priority, frequency,
     days_of_week, assigned_to, category_id, is_active, next_due_date,
-    task_type, default_status, attachments,
+    task_type, default_status, attachments, impact, estimated_time,
   } = body as {
     title?: string; description?: string; priority?: string; frequency?: string;
     days_of_week?: number[]; assigned_to?: string | null; category_id?: string | null;
     is_active?: boolean; next_due_date?: string | null;
     task_type?: string; default_status?: string; attachments?: Json[];
+    impact?: string | null; estimated_time?: number | null;
   };
 
   // --- Validation ---
@@ -119,6 +120,15 @@ export async function PUT(
 
   if (default_status !== undefined && !VALID_STATUSES.includes(default_status)) {
     return NextResponse.json({ error: 'Estado por defecto invalido' }, { status: 400 });
+  }
+
+  const VALID_IMPACTS = ['high', 'medium', 'low'];
+  if (impact !== undefined && impact !== null && !VALID_IMPACTS.includes(impact)) {
+    return NextResponse.json({ error: 'Impacto invalido. Valores permitidos: high, medium, low' }, { status: 400 });
+  }
+
+  if (estimated_time !== undefined && estimated_time !== null && (!Number.isFinite(estimated_time) || estimated_time <= 0)) {
+    return NextResponse.json({ error: 'El tiempo estimado debe ser un numero positivo (en minutos)' }, { status: 400 });
   }
 
   // Resolve the effective frequency and days for cross-field validation
@@ -198,6 +208,14 @@ export async function PUT(
   }
   if (attachments !== undefined) {
     updateData.attachments = attachments;
+  }
+  if (impact !== undefined) {
+    updateData.impact = impact;
+    if (impact !== existing.impact) changes.impact = { from: existing.impact, to: impact };
+  }
+  if (estimated_time !== undefined) {
+    updateData.estimated_time = estimated_time;
+    if (estimated_time !== existing.estimated_time) changes.estimated_time = { from: existing.estimated_time, to: estimated_time };
   }
 
   if (Object.keys(updateData).length === 0) {

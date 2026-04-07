@@ -91,11 +91,12 @@ export async function POST(request: NextRequest) {
   const {
     title, description, priority, frequency,
     days_of_week, assigned_to, category_id, is_active,
-    task_type, default_status, attachments,
+    task_type, default_status, attachments, impact, estimated_time,
   } = body as {
     title?: string; description?: string; priority?: string; frequency?: string;
     days_of_week?: number[]; assigned_to?: string; category_id?: string; is_active?: boolean;
     task_type?: string; default_status?: string; attachments?: Json[];
+    impact?: string; estimated_time?: number;
   };
 
   // --- Validation ---
@@ -125,6 +126,15 @@ export async function POST(request: NextRequest) {
   const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'blocked'];
   if (default_status && !VALID_STATUSES.includes(default_status)) {
     return NextResponse.json({ error: 'Estado por defecto invalido' }, { status: 400 });
+  }
+
+  const VALID_IMPACTS = ['high', 'medium', 'low'];
+  if (impact && !VALID_IMPACTS.includes(impact)) {
+    return NextResponse.json({ error: 'Impacto invalido. Valores permitidos: high, medium, low' }, { status: 400 });
+  }
+
+  if (estimated_time !== undefined && (!Number.isFinite(estimated_time) || estimated_time <= 0)) {
+    return NextResponse.json({ error: 'El tiempo estimado debe ser un numero positivo (en minutos)' }, { status: 400 });
   }
 
   const resolvedDays = Array.isArray(days_of_week) ? days_of_week : [];
@@ -167,6 +177,8 @@ export async function POST(request: NextRequest) {
     task_type: (task_type ?? 'planeada') as TaskType,
     default_status: (default_status ?? 'pending') as 'pending' | 'in_progress' | 'completed' | 'blocked',
     attachments: attachments ?? [],
+    impact: (impact ?? null) as 'high' | 'medium' | 'low' | null,
+    estimated_time: estimated_time ?? null,
   };
 
   const { data: newRecurrence, error } = await supabase

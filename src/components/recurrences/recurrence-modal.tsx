@@ -70,6 +70,8 @@ export function RecurrenceModal({
   const [taskType, setTaskType] = useState<TaskType>("planeada");
   const [defaultStatus, setDefaultStatus] = useState("pending");
   const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [impact, setImpact] = useState("");
+  const [estimatedHours, setEstimatedHours] = useState("");
   const [frequency, setFrequency] = useState<RecurrenceFrequency>("weekly");
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
   const [categoryId, setCategoryId] = useState("");
@@ -92,6 +94,10 @@ export function RecurrenceModal({
       setTaskType((recurrence.task_type as TaskType) ?? "planeada");
       setDefaultStatus(recurrence.default_status ?? "pending");
       setPriority(recurrence.priority);
+      setImpact(recurrence.impact ?? "");
+      setEstimatedHours(
+        recurrence.estimated_time ? String(recurrence.estimated_time / 60) : ""
+      );
       setFrequency(recurrence.frequency);
       setDaysOfWeek(recurrence.days_of_week ?? []);
       setCategoryId(recurrence.category_id ?? "");
@@ -110,6 +116,8 @@ export function RecurrenceModal({
       setTaskType("planeada");
       setDefaultStatus("pending");
       setPriority("medium");
+      setImpact("");
+      setEstimatedHours("");
       setFrequency("weekly");
       setDaysOfWeek([]);
       setCategoryId("");
@@ -232,6 +240,9 @@ export function RecurrenceModal({
     if (!title.trim()) errs.title = "El titulo es obligatorio";
     if (!defaultStatus) errs.defaultStatus = "Selecciona un estado";
     if (!priority) errs.priority = "Selecciona una prioridad";
+    if (!impact) errs.impact = "Selecciona el impacto esperado";
+    if (!estimatedHours || Number(estimatedHours) <= 0)
+      errs.estimatedHours = "Ingresa un tiempo estimado valido";
     if (!frequency) errs.frequency = "Selecciona una frecuencia";
     if (showDaysOfWeek && daysOfWeek.length === 0)
       errs.daysOfWeek = "Selecciona al menos un dia";
@@ -285,6 +296,8 @@ export function RecurrenceModal({
       task_type: taskType,
       default_status: defaultStatus,
       priority,
+      impact,
+      estimated_time: Math.round(Number(estimatedHours) * 60),
       frequency,
       days_of_week: showDaysOfWeek ? daysOfWeek : [],
       category_id: finalCategoryId || null,
@@ -469,6 +482,48 @@ export function RecurrenceModal({
                 <option value="high">Alta</option>
                 <option value="urgent">Urgente</option>
               </select>
+            </div>
+          </div>
+
+          {/* Impact + Estimated Time row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-text-muted">
+                Impacto Esperado *
+              </label>
+              <select
+                value={impact}
+                onChange={(e) => setImpact(e.target.value)}
+                className={cn(
+                  "h-9 w-full rounded-lg border bg-card px-3 text-xs text-text focus:border-accent/50 focus:outline-none",
+                  errors.impact ? "border-danger/50" : "border-border"
+                )}
+              >
+                <option value="">Seleccionar...</option>
+                <option value="high">Alto</option>
+                <option value="medium">Medio</option>
+                <option value="low">Bajo</option>
+              </select>
+              {errors.impact && (
+                <p className="mt-1 text-[10px] text-danger">{errors.impact}</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-text-muted">
+                Tiempo Estimado (horas) *
+              </label>
+              <Input
+                type="number"
+                min="0.1"
+                step="0.5"
+                value={estimatedHours}
+                onChange={(e) => setEstimatedHours(e.target.value)}
+                placeholder="ej: 2.5"
+                className={cn("h-9 text-xs", errors.estimatedHours ? "border-danger/50" : "")}
+              />
+              {errors.estimatedHours && (
+                <p className="mt-1 text-[10px] text-danger">{errors.estimatedHours}</p>
+              )}
             </div>
           </div>
 
