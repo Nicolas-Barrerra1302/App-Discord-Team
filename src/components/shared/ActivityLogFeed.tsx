@@ -95,6 +95,28 @@ export function ActivityLogFeed({ initialLogs, userId, userIdsFilter }: Activity
   const filterKey = userIdsFilter ? userIdsFilter.slice().sort().join(",") : userId ?? "";
   const prevFilterKeyRef = useRef(filterKey);
 
+  // Listen for 'checkin-refresh' custom event (fired by PersonalDashboard after daily close)
+  // Waits 1.5 s to allow the waitUntil background insert to commit before re-fetching.
+  useEffect(() => {
+    function handleCheckinRefresh() {
+      setTimeout(async () => {
+        try {
+          const params = buildParams(0, userId, userIdsFilter);
+          const res = await fetch(`/api/activity?${params.toString()}`);
+          if (!res.ok) return;
+          const json = await res.json() as { data: ActivityLogEvent[]; hasMore: boolean };
+          setLogs(json.data);
+          setOffset(json.data.length);
+          setHasMore(json.hasMore);
+        } catch {
+          // Non-fatal — user can manually reload
+        }
+      }, 1500);
+    }
+    window.addEventListener('checkin-refresh', handleCheckinRefresh);
+    return () => window.removeEventListener('checkin-refresh', handleCheckinRefresh);
+  }, [userId, userIdsFilter]);
+
   // Reset & re-fetch when userIdsFilter changes (admin multi-select)
   useEffect(() => {
     if (prevFilterKeyRef.current === filterKey) return;

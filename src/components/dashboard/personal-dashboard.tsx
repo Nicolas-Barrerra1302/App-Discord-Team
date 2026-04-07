@@ -182,6 +182,8 @@ export function PersonalDashboard({
     setCheckinClosed(true);
     setCheckinSummary(summary);
     setShowCheckinModal(false);
+    // Signal ActivityLogFeed to refresh after waitUntil background insert commits
+    window.dispatchEvent(new CustomEvent('checkin-refresh'));
   }, []);
 
   // Fetch metrics when any filter changes

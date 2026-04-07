@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getCurrentUser } from '@/lib/supabase/database';
+import { getCurrentUser, logActivity } from '@/lib/supabase/database';
 import { getTodayColombia, colombiaStartOfDay, colombiaEndOfDay } from '@/lib/tasks/dates';
 
 export const dynamic = 'force-dynamic';
@@ -240,6 +241,68 @@ export async function POST(request: NextRequest) {
       { error: errObj.message ?? 'Error desconocido', details: errObj.details, hint: errObj.hint, code: errObj.code },
       { status: 500 }
     );
+  }
+
+  // --- Award 100 pts if closed before 23:59 COT ---
+  // Non-blocking: does NOT delay the API response.
+  const cotTimeStr = new Date().toLocaleTimeString('en-CA', {
+    timeZone: 'America/Bogota',
+    hour12: false,
+  }); // "HH:MM:SS"
+  const [cotHour, cotMinute] = cotTimeStr.split(':').map(Number);
+  const closedOnTime = cotHour < 23 || (cotHour === 23 && cotMinute < 59);
+
+  // Only process & log if closed on time
+  if (closedOnTime) {
+    waitUntil((async () => {
+      // Resolve active bonus launch
+      const { data: launch } = await adminSupa
+        .from('bonus_launches')
+        .select('id')
+        .in('status', ['active', 'projected'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle() as { data: { id: string } | null };
+
+      if (launch) {
+        const { error: bonusError } = await adminSupa
+          .from('bonus_events')
+          .insert({
+            launch_id: launch.id,
+            user_id: user.id,
+            event_type: 'daily_close',
+            points: 100,
+            description: `Cierre de día a tiempo (${today})`,
+            registered_by: user.id,
+            metadata: {
+              source: 'daily_checkin',
+              checkin_date: today,
+              cot_time: cotTimeStr,
+            },
+          } as never);
+
+        if (bonusError) {
+          console.error(
+            `[LEDGER_ERROR] bonus_event daily_close insert failed user_id=${user.id} date=${today}: ${String(bonusError)}`,
+          );
+        }
+      }
+
+      // Log activity with +100 pts badge — only if on time
+      await logActivity(adminSupa, {
+        userId: user.id,
+        action: `Cerró el día a tiempo — ${summary.trim().slice(0, 80)}${summary.trim().length > 80 ? '…' : ''}`,
+        entityType: 'checkin',
+        entityId: data!.id,
+        targetName: 'Cierre de Día',
+        impact: '+100 pts',
+        metadata: {
+          checkin_date: today,
+          awarded_points: 100,
+          cot_time: cotTimeStr,
+        },
+      });
+    })());
   }
 
   return NextResponse.json({ checkin: data }, { status: 201 });
