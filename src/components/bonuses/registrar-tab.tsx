@@ -51,8 +51,12 @@ interface RecentEvent {
 // handled by the gamification engine — registering them here would
 // create duplicates and compromise the audit trail.
 const EVENT_TYPES = [
-  { value: "culture_bonus", label: "Bonus de cultura" },
-  { value: "other", label: "Otro (requiere descripcion)" },
+  { value: "quality_bonus", label: "Bonus de calidad" },
+  { value: "initiative", label: "Iniciativa" },
+  { value: "collaboration", label: "Colaboracion" },
+  { value: "penalty", label: "Penalizacion" },
+  { value: "adjustment", label: "Ajuste" },
+  { value: "other", label: "Opcion Abierta" },
 ] as const;
 
 const eventTypeLabels: Record<string, string> = Object.fromEntries(
@@ -106,7 +110,7 @@ export default function RegistrarTab({ users }: RegistrarTabProps) {
   // --- Form state ---
   const [selectedLaunchId, setSelectedLaunchId] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [eventType, setEventType] = useState("culture_bonus");
+  const [eventType, setEventType] = useState("quality_bonus");
   const [points, setPoints] = useState(0);
   const [description, setDescription] = useState("");
 

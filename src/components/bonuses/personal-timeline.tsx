@@ -30,6 +30,7 @@ const eventTypeLabels: Record<string, string> = {
   daily_close: "Cierre de dia",
   missed_daily_close: "Olvido cerrar el dia",
   settlement: "Liquidacion",
+  other: "Opcion Abierta",
 };
 
 // ---------------------------------------------------------------------------
@@ -87,15 +88,22 @@ export default function PersonalTimeline({ currentUser }: PersonalTimelineProps)
     return () => { cancelled = true; };
   }, [currentUser.id]);
 
-  // Summary calculations
+  // Filter out zero-point events that don't affect real scoring
+  // (legacy simulation events, etc.) — keep missed_daily_close (0 pts penalty)
+  const displayEvents = useMemo(
+    () => events.filter((e) => e.points !== 0 || e.event_type === "missed_daily_close"),
+    [events],
+  );
+
+  // Summary calculations (use filtered list)
   const summary = useMemo(() => {
-    const totalPoints = events.reduce((sum, e) => sum + e.points, 0);
-    const positiveCount = events.filter((e) => e.points > 0).length;
-    const negativeCount = events.filter(
-      (e) => e.points < 0 || e.event_type === "missed_daily_close"
+    const totalPoints = displayEvents.reduce((sum, e) => sum + e.points, 0);
+    const positiveCount = displayEvents.filter((e) => e.points > 0).length;
+    const negativeCount = displayEvents.filter(
+      (e) => e.points < 0 || (e.event_type === "missed_daily_close" && e.points <= 0)
     ).length;
     return { totalPoints, positiveCount, negativeCount };
-  }, [events]);
+  }, [displayEvents]);
 
   // =========================================================================
   // RENDER
@@ -170,7 +178,7 @@ export default function PersonalTimeline({ currentUser }: PersonalTimelineProps)
       </div>
 
       {/* Timeline */}
-      {events.length === 0 ? (
+      {displayEvents.length === 0 ? (
         /* Empty state */
         <div className="text-center py-12">
           <div className="flex items-center justify-center w-14 h-14 rounded-full bg-card-secondary mx-auto mb-4">
@@ -189,7 +197,7 @@ export default function PersonalTimeline({ currentUser }: PersonalTimelineProps)
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
           {/* Event items */}
-          {events.map((event) => {
+          {displayEvents.map((event) => {
             const isMissedClose = event.event_type === "missed_daily_close";
             const isPositive = event.points > 0 && !isMissedClose;
             const label = eventTypeLabels[event.event_type] ?? event.event_type;

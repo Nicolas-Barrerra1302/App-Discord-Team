@@ -69,7 +69,7 @@ export type Database = {
           id: string
           launch_id: string
           user_id: string
-          event_type: "task_completed" | "early_delivery" | "late_delivery" | "quality_bonus" | "initiative" | "collaboration" | "streak" | "penalty" | "adjustment" | "settlement" | "kpi_weekly" | "daily_close" | "missed_daily_close"
+          event_type: "task_completed" | "early_delivery" | "late_delivery" | "quality_bonus" | "initiative" | "collaboration" | "streak" | "penalty" | "adjustment" | "settlement" | "kpi_weekly" | "daily_close" | "missed_daily_close" | "other"
           points: number
           description: string | null
           registered_by: string
@@ -81,7 +81,7 @@ export type Database = {
           id?: string
           launch_id: string
           user_id: string
-          event_type: "task_completed" | "early_delivery" | "late_delivery" | "quality_bonus" | "initiative" | "collaboration" | "streak" | "penalty" | "adjustment" | "settlement" | "kpi_weekly" | "daily_close" | "missed_daily_close"
+          event_type: "task_completed" | "early_delivery" | "late_delivery" | "quality_bonus" | "initiative" | "collaboration" | "streak" | "penalty" | "adjustment" | "settlement" | "kpi_weekly" | "daily_close" | "missed_daily_close" | "other"
           points: number
           description?: string | null
           registered_by: string

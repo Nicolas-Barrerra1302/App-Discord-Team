@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentUser, isAdmin, isSuperAdmin, logActivity } from '@/lib/supabase/database';
+import { getCurrentUser, isAdmin, logActivity } from '@/lib/supabase/database';
 import type { BonusEvent, BonusLaunch, User } from '@/lib/types';
 
 // Only types that are safe for human manual registration via the "Registrar" modal.
@@ -13,7 +13,7 @@ import type { BonusEvent, BonusLaunch, User } from '@/lib/types';
 //   kpi_weekly                                      → POST /api/kpis/submit
 //   daily_close / missed_daily_close                → evaluateGhostClose
 const MANUAL_REGISTRATION_EVENT_TYPES = [
-  'quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment',
+  'quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment', 'other',
 ] as const;
 
 // =============================================================================
@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
 
-  if (!isSuperAdmin(user)) {
+  if (!isAdmin(user)) {
     return NextResponse.json(
-      { error: 'Solo super_admin puede registrar eventos' },
+      { error: 'Solo administradores pueden registrar eventos' },
       { status: 403 }
     );
   }

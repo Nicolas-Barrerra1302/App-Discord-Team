@@ -140,6 +140,10 @@ if (found.length > 0) return NextResponse.json({ error: `...` }, { status: 400 }
 - `block_type text` — CHECK: `internal` | `external`. Set when task moves to blocked status
 - `block_reason text` — Free text justification for block. Saved alongside `task_comments` entry
 
+**task_recurrences extra columns (added in Migration 022):**
+- `impact text` — CHECK: `high` | `medium` | `low`. Nullable for backward compat. Required via frontend validation. Copied to each generated task instance by the cron
+- `estimated_time integer` — Minutes (nullable). UI input in hours, converted on submit. Copied to each generated task instance by the cron
+
 RLS enforced: members see only their own data. Admin/CEO see all.
 
 **Performance Indexes (Migrations 014 + 015 + 017 + 021):**
@@ -185,6 +189,7 @@ SQL files (run in order in Supabase SQL Editor):
 - `supabase/migrations/019_fix_activity_log_gamification_impact.sql` — Removes hardcoded `'+5 pts'` from `log_task_activity()` trigger. Completed tasks now get `impact = NULL`; API backfills the real score via `waitUntil(createAdminClient().update(...))` after scoring runs
 - `supabase/migrations/020_daily_checkins_auto_closed.sql` — Adds `auto_closed boolean NOT NULL DEFAULT false` to `daily_checkins`. Ghost close upserts with `auto_closed = true` so admin audit shows day as officially closed
 - `supabase/migrations/021_audit_fixes_h5.sql` — **Enterprise Audit (2026-03-28).** Three sections: (1) **4 B-Tree indexes:** `kpi_submissions(week_start)`, `kpi_tracking(week_start)`, `bonus_events(event_type)`, `daily_checkins(checkin_date)` — closes sequential scan gaps for admin week-navigation and cross-user date range queries where compound indexes required an unbound leading column. (2) **3 RLS hardening fixes:** `kpi_submissions_update` WITH CHECK now enforces `status = 'draft'` to block direct status escalation to 'submitted' via PostgREST; `kpi_tracking_update` + `kpi_tracking_insert` add subquery freeze guard (`NOT EXISTS kpi_submissions WHERE status='submitted' AND week_start = ...`) preventing post-submission value tampering that corrupts admin audit trail; `daily_checkins` gains an explicit admin UPDATE policy for corrections (no member UPDATE — check-ins remain immutable for members). (3) **3 FK ON DELETE fixes:** `kpi_tracking.user_id` RESTRICT → CASCADE (mirrors `daily_checkins` pattern); `kpi_submissions.user_id` RESTRICT → CASCADE; `kpi_submissions.bonus_event_id` RESTRICT → SET NULL (nullable FK should not block bonus_event deletion during corrections).
+- `supabase/migrations/022_recurrence_impact_estimated_time.sql` — Adds `impact VARCHAR(10) CHECK (IN 'high','medium','low')` and `estimated_time INTEGER CHECK (> 0)` to `task_recurrences`. Both nullable for backward compat. Closes the field parity gap between `TaskModal` and `RecurrenceModal` — generated task instances now inherit these values from the template.
 
 **Migration note:** Always end migrations with `NOTIFY pgrst, 'reload schema';` to refresh PostgREST schema cache.
 

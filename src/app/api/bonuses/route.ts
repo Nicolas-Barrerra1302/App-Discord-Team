@@ -219,29 +219,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // --- Insert events for each payment ---
-  const eventInserts = payments.map((p) => ({
-    launch_id: newLaunch.id,
-    user_id: p.userId,
-    event_type: 'adjustment' as BonusEvent['event_type'],
-    points: p.points,
-    description: `Bono simulado: $${p.simulatedBonus} (${p.poolPercentage}% del pool)`,
-    registered_by: user.id,
-  }));
-
-  const { error: eventsError } = await supabase
-    .from('bonus_events')
-    .insert(eventInserts as never) as { error: unknown };
-
-  if (eventsError) {
-    console.error('Error al crear eventos de bonos:', eventsError);
-    // Rollback: eliminar el launch huérfano para mantener consistencia
-    await supabase.from('bonus_launches').delete().eq('id', newLaunch.id);
-    return NextResponse.json(
-      { error: 'Error al registrar los eventos. El lanzamiento fue revertido.' },
-      { status: 500 }
-    );
-  }
+  // NOTE: Simulation events are NOT persisted to bonus_events.
+  // Projected distributions are display-only (frontend/simulator).
+  // Real bonus_events are created only when registering manual events
+  // or when the gamification engine scores tasks/KPIs.
 
   // --- Activity log (non-blocking) ---
   waitUntil(

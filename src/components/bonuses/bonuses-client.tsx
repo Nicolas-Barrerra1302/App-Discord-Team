@@ -262,7 +262,7 @@ export default function BonusesClient({
             </Button>
           );
         })}
-        {currentUser.role === "super_admin" && (
+        {(currentUser.role === "super_admin" || currentUser.role === "ceo") && (
           <Button
             variant={activeTab === "registrar" ? "default" : "ghost"}
             size="sm"
