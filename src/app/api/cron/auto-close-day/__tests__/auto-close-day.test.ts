@@ -28,7 +28,7 @@ const TEST_CRON_SECRET = 'test-cron-secret-xyz';
 function makeProdRequest(): NextRequest {
   return {
     headers: { get: (h: string) => (h === 'authorization' ? `Bearer ${TEST_CRON_SECRET}` : null) },
-    nextUrl: { searchParams: { get: (_: string) => null } },
+    nextUrl: { searchParams: { get: () => null } },
   } as unknown as NextRequest;
 }
 
@@ -39,7 +39,7 @@ function makeProdRequest(): NextRequest {
  */
 function makeForceRequest(): NextRequest {
   return {
-    headers: { get: (_: string) => null },
+    headers: { get: () => null },
     nextUrl: { searchParams: { get: (k: string) => (k === 'force' ? 'true' : null) } },
   } as unknown as NextRequest;
 }
