@@ -122,7 +122,7 @@ npx tsc --noEmit     # Type check
 | Hito | Estado |
 |------|--------|
 | 1-4 | DONE (auth, tasks, recurrences, performance). Hito 4 hardened: strict timebox, isOverdue, multi-select, Activity Log Timeline, Coaching metrics, Burn-Up Chart, Personal Dashboard "Modo Enfoque", Daily Check-in ("Cierre de Día") con modal + admin widget + completion ring SVG. UI Design System (`src/components/ui/`): Card, Button, Badge, Input — applied across all 3 dashboards. Colombia timezone fix (all metrics use `toColombiaDate()` instead of UTC `.substring(0,10)`) |
-| 5. Bonos | 9/10 (falta cross-launch chart -> Hito 8) |
+| 5. Bonos | 9/10 (falta cross-launch chart -> Hito 8). Bugs 2026-04-09 fixed: auto-close cron, bono simulado eliminado del ledger, event_type 'other', CEO acceso registro |
 | 5.5 Ajustes operativos | DONE (KPI freeze, block modal, recurrences UX, category delete, hard delete restriction, toast feedback, cron dev-only, RLS migration 002, absence permissions, cron force mode, advanced category delete) |
 | 5.6 KPI Tracking & Gamification Engine | DONE (migration 015: kpi_definitions + kpi_tracking + kpi_submissions + RLS. Scoring engine asc/desc direction. COT deadline enforcement. Admin /admin/kpis: create/toggle/delete KPIs, week navigation, member tracking table. Member /kpis: draft save, live score preview, submit lock, bonus_event integration, ActivityLogFeed) |
 | 6. Metricas Auditoria | DONE (estimated_time, impact, block_type/block_reason columns + 3 audit widgets + drill-down interactivo) |

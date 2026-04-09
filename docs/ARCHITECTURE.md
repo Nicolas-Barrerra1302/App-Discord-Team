@@ -39,11 +39,12 @@ src/app/
     performance/route.ts   # GET (all members — admin only)
     performance/[userId]/  # GET (single member — own or admin)
     bonuses/route.ts       # GET (launches+events) + POST (create launch)
-    bonuses/events/route.ts # GET (events) + POST (register event — super_admin only)
+    bonuses/events/route.ts # GET (events) + POST (register event — super_admin + ceo)
     bonuses/[id]/close/    # PUT (close launch — super_admin only)
     activity/route.ts      # GET (paginated activity log) — ?users=id1,id2&limit=20&offset=0, admin sees all or filtered, non-admin forced to own
     checkins/today/        # GET (pre-fill today's metrics) + POST (save daily check-in) — admin client, force-dynamic
     cron/generate-tasks/   # POST (daily cron, ?force=true skips schedule/dupe checks in dev) + GET (health check)
+    cron/auto-close-day/   # POST (Tue-Sat 2AM COT, penalizes users without daily_close/missed_daily_close) + GET (health check)
     kpis/
       definitions/route.ts       # GET (all active — members own, admins all) + POST (create, admin only)
       definitions/[id]/route.ts  # PUT (toggle is_active / update fields) + DELETE (soft-delete if tracking exists)
@@ -120,7 +121,7 @@ if (found.length > 0) return NextResponse.json({ error: `...` }, { status: 400 }
 - `POST /api/checkins/today`: rejects `hours_worked, fires_handled, blocks_count, completion_pct, user_id, checkin_date` — all server-calculated
 - `POST /api/kpis/submit`: rejects `points, total_points, max_possible, score, user_id, submitted_at, status, bonus_event_id` — scoring is always server-side. Definitions fetched **before** entries upsert — `kpi_id` ownership validated against `assigned_to` set before any DB write (prevents foreign kpi_id injection). `entries[]` bounded to max 50. `Number.isFinite()` used instead of `isNaN()` (rejects `Infinity`/`-Infinity`).
 - `PUT /api/tasks/[id]`: rejects `completed_at, created_at, updated_at, created_by, id`. Added string length bounds: `title` ≤500, `description` ≤10000, `block_reason` ≤2000.
-- `POST /api/bonuses/events`: rejects `registered_by, created_at, id`. **MANUAL_REGISTRATION_EVENT_TYPES only:** `['quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment']`. All automated types (`task_completed`, `kpi_weekly`, `daily_close`, `missed_daily_close`, `early_delivery`, `late_delivery`, `streak`, `settlement`) return 400. `points` bounded to ±9999. `description` ≤500 chars. Dedup check removed `.eq('points', points)` clause (Rule 30 compliance).
+- `POST /api/bonuses/events`: rejects `registered_by, created_at, id`. **MANUAL_REGISTRATION_EVENT_TYPES only:** `['quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment', 'other']`. Access: `isAdmin()` (super_admin + ceo). All automated types (`task_completed`, `kpi_weekly`, `daily_close`, `missed_daily_close`, `early_delivery`, `late_delivery`, `streak`, `settlement`) return 400. `points` bounded to ±9999. `description` ≤500 chars. Dedup check removed `.eq('points', points)` clause (Rule 30 compliance).
 - `POST /api/bonuses`: `payments` bounded to max 20. `points` per payment requires `Number.isFinite() && Number.isInteger()`. `name` ≤200 chars.
 
 **Gamification Dedup Rules (Audit 2026-03-28):**
@@ -190,6 +191,7 @@ SQL files (run in order in Supabase SQL Editor):
 - `supabase/migrations/020_daily_checkins_auto_closed.sql` — Adds `auto_closed boolean NOT NULL DEFAULT false` to `daily_checkins`. Ghost close upserts with `auto_closed = true` so admin audit shows day as officially closed
 - `supabase/migrations/021_audit_fixes_h5.sql` — **Enterprise Audit (2026-03-28).** Three sections: (1) **4 B-Tree indexes:** `kpi_submissions(week_start)`, `kpi_tracking(week_start)`, `bonus_events(event_type)`, `daily_checkins(checkin_date)` — closes sequential scan gaps for admin week-navigation and cross-user date range queries where compound indexes required an unbound leading column. (2) **3 RLS hardening fixes:** `kpi_submissions_update` WITH CHECK now enforces `status = 'draft'` to block direct status escalation to 'submitted' via PostgREST; `kpi_tracking_update` + `kpi_tracking_insert` add subquery freeze guard (`NOT EXISTS kpi_submissions WHERE status='submitted' AND week_start = ...`) preventing post-submission value tampering that corrupts admin audit trail; `daily_checkins` gains an explicit admin UPDATE policy for corrections (no member UPDATE — check-ins remain immutable for members). (3) **3 FK ON DELETE fixes:** `kpi_tracking.user_id` RESTRICT → CASCADE (mirrors `daily_checkins` pattern); `kpi_submissions.user_id` RESTRICT → CASCADE; `kpi_submissions.bonus_event_id` RESTRICT → SET NULL (nullable FK should not block bonus_event deletion during corrections).
 - `supabase/migrations/022_recurrence_impact_estimated_time.sql` — Adds `impact VARCHAR(10) CHECK (IN 'high','medium','low')` and `estimated_time INTEGER CHECK (> 0)` to `task_recurrences`. Both nullable for backward compat. Closes the field parity gap between `TaskModal` and `RecurrenceModal` — generated task instances now inherit these values from the template.
+- `supabase/migrations/023_add_other_event_type.sql` — Drops and recreates `bonus_events_event_type_check` to include `'other'` (Opción Abierta). Enables manual registration of open-ended point events without a predefined category.
 
 **Migration note:** Always end migrations with `NOTIFY pgrst, 'reload schema';` to refresh PostgREST schema cache.
 
@@ -365,8 +367,8 @@ All critical background processes emit **structured, machine-parseable log lines
 | Prefix | File | Severity | Description |
 |--------|------|----------|-------------|
 | `[CRON]` | `cron/generate-tasks/route.ts` | INFO | Per-recurrence decisions (SKIP, GENERANDO) |
-| `[CRON_ERROR]` | `cron/generate-tasks/route.ts` | ERROR | Recoverable failures with full context |
-| `[CRON_SUMMARY]` | `cron/generate-tasks/route.ts` | INFO | End-of-run machine-parseable summary |
+| `[CRON_ERROR]` | `cron/generate-tasks/route.ts` + `cron/auto-close-day/route.ts` | ERROR | Recoverable failures with full context |
+| `[CRON_SUMMARY]` | `cron/generate-tasks/route.ts` + `cron/auto-close-day/route.ts` | INFO | End-of-run machine-parseable summary |
 | `[WEBHOOK_ERROR]` | `lib/webhooks/dispatcher.ts` | WARN | Webhook dispatch failure (TIMEOUT or NETWORK_ERROR) |
 | `[LEDGER_ERROR]` | `lib/gamification/ledger-service.ts` | ERROR | Bonus event insert failures or unexpected exceptions |
 | `[LEDGER_WARN]` | `lib/gamification/ledger-service.ts` | WARN | Non-fatal side-effect failures (e.g., auto-close upsert) |
@@ -391,13 +393,14 @@ All critical background processes emit **structured, machine-parseable log lines
 **Ledger error** — always includes `user_id`, `task_id` / `missed_date`, `launch_id`, and score context:
 ```
 [LEDGER_ERROR] bonus_event insert failed event_type=task_completed user_id=<uuid> task_id=<uuid> launch_id=<uuid> score=575: <DB error>
-[LEDGER_ERROR] Unhandled exception in evaluateGhostClose user_id=<uuid> yesterday_cot=2026-03-28: <message>
-[LEDGER_WARN] daily_checkins auto-close upsert failed user_id=<uuid> date=2026-03-28: <error>
+[CRON_ERROR] auto-close bonus_event insert failed user_id=<uuid> date=2026-03-28: <DB error>
+[CRON_WARN] auto-close checkin UPDATE failed user_id=<uuid> date=2026-03-28: <error>
+[CRON_SUMMARY] auto_close date=2026-03-28 users_checked=6 users_penalized=2 errors=0
 ```
 
 ### Design Rules
 - Every log line is grep-able by prefix → enables instant filter in Vercel Logs or any log aggregation service
 - Context keys (`user_id`, `task_id`, `recurrence_id`, `event_type`) are always present — no anonymous failures
 - `[WEBHOOK_ERROR]` serialises **payload keys only** (not values of full objects) to avoid log spam from large payloads
-- `[LEDGER_WARN]` vs `[LEDGER_ERROR]` distinction: non-fatal side-effects (auto-close upsert) use WARN; data integrity failures (bonus_event insert) use ERROR
+- `[LEDGER_WARN]` vs `[LEDGER_ERROR]` distinction: non-fatal side-effects use WARN; data integrity failures (bonus_event insert) use ERROR. Auto-close cron uses `[CRON_WARN]` / `[CRON_ERROR]` / `[CRON_SUMMARY]` (not LEDGER prefixes)
 - When migrating to an external observability platform (Sentry, Datadog, Axiom), the structured prefixes map 1:1 to log levels and can be forwarded via a thin adapter without changing callers

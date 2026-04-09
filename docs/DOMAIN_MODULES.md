@@ -181,22 +181,22 @@ Gamified point system per launch. 7 tabs (admin): Simulador, Historial, Ranking,
 - Client: `bonuses-client.tsx` — Admin gets all tabs. Registrar only for `super_admin`. CEO Dashboard only for `super_admin`/`ceo` (hidden from `member` role entirely).
 - API:
   - `/api/bonuses` — GET (launches + events grouped), POST (create launch + payment events)
-  - `/api/bonuses/events` — GET (filtered), POST (super_admin registers point event). Rejects events for closed launches (HTTP 400)
+  - `/api/bonuses/events` — GET (filtered), POST (super_admin + ceo register point event). Rejects events for closed launches (HTTP 400)
   - `/api/bonuses/[id]/close` — PUT (super_admin closes with revenue_real + margen_real, inserts `settlement` events with frozen `final_bonus_amount`)
-- Event types (full DB check constraint): `task_completed`, `early_delivery`, `late_delivery`, `quality_bonus`, `initiative`, `collaboration`, `streak`, `penalty`, `adjustment`, `settlement`, `kpi_weekly`, `daily_close`, `missed_daily_close`
+- Event types (full DB check constraint): `task_completed`, `early_delivery`, `late_delivery`, `quality_bonus`, `initiative`, `collaboration`, `streak`, `penalty`, `adjustment`, `settlement`, `kpi_weekly`, `daily_close`, `missed_daily_close`, `other`
 - **Idempotency guard (patched 2026-03-27, Rule 30 hardened 2026-03-28):** `POST /api/bonuses/events` queries for identical event (`launch_id` + `user_id` + `event_type`) created within the last 10 seconds before INSERT. Returns `409 Conflict` on duplicate. **`.eq('points', points)` was REMOVED** from dedup — per Rule 30, two legitimate events can share the same point value, causing false-positive deduplication. Business key for manual events is type+user+launch within the time window, not the point value.
 - **Atomic launch creation (patched 2026-03-27):** `POST /api/bonuses` inserts launch then events. If event INSERT fails, the orphan launch is deleted (`.delete().eq('id', newLaunch.id)`) before returning 500. No orphan rows.
 - Cierre contable: Closed launches persist `final_bonus_amount` on settlement events. Historial reads frozen values. Closed launches reject new events at API and RLS level.
 - Pending: cross-launch comparison chart (moved to Hito 8)
 
 **Registrar tab — event type restrictions (CRITICAL — enforced at API level since 2026-03-28):**
-`POST /api/bonuses/events` accepts ONLY `MANUAL_REGISTRATION_EVENT_TYPES`: `['quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment']`. Any other value returns **400 Bad Request**.
+`POST /api/bonuses/events` accepts ONLY `MANUAL_REGISTRATION_EVENT_TYPES`: `['quality_bonus', 'initiative', 'collaboration', 'penalty', 'adjustment', 'other']`. Access: `isAdmin()` (super_admin + ceo). Any other value returns **400 Bad Request**.
 
 All automated event types are **strictly forbidden** at the API level:
 - `task_completed`, `early_delivery`, `late_delivery`, `streak` → task gamification engine (`ledger-service.ts`)
 - `settlement` → launch-close workflow (`/api/bonuses/[id]/close`)
 - `kpi_weekly` → `POST /api/kpis/submit`
-- `daily_close`, `missed_daily_close` → `evaluateGhostClose()` in `ledger-service.ts`
+- `daily_close`, `missed_daily_close` → `POST /api/cron/auto-close-day` (Vercel Cron, Tue-Sat 2AM COT)
 
 Injecting any of these types manually would cause point duplication and score inflation. The backend is the enforcement layer — UI dropdown restrictions are not sufficient on their own. Additional bounds: `points` ±9999, `description` ≤500 chars.
 
@@ -212,9 +212,9 @@ Injecting any of these types manually would cause point duplication and score in
 
 **Gamification Engine (added Hito 5.7 — 2026-03-28):**
 - `src/lib/gamification/task-scoring.ts` — Pure scoring engine. 4 matrices (A/B/C/D) by impact × effort. All math server-side, COT-aware
-- `src/lib/gamification/ledger-service.ts` — Only gateway for automated `bonus_events` writes. Admin client only. `processTaskCompletion` deduplicates by `metadata->>task_id` + 10s window (NOT by `points` — Rule 30). `evaluateGhostClose` deduplicates by full-day COT range. **Both functions are wrapped in a top-level `try/catch` (added 2026-03-29):** `getActiveLaunch()` and Supabase queries can throw unexpected network exceptions (DNS/TLS timeout). Without the guard, an exception propagates to the `waitUntil()` caller and surfaces as `UnhandledPromiseRejection` on Vercel; worse, if `evaluateGhostClose` is called during a Server Component page load, an uncaught throw returns a 500 to the user. Both functions now always return their typed result objects — they never throw.
+- `src/lib/gamification/ledger-service.ts` — Only gateway for automated `bonus_events` writes. Admin client only. `processTaskCompletion` deduplicates by `metadata->>task_id` + 10s window (NOT by `points` — Rule 30). Wrapped in a top-level `try/catch` — never throws. `evaluateGhostClose` removed (2026-04-07); auto-close migrated to Vercel Cron.
 - Activity log backfill: trigger writes `impact = NULL` for completed tasks (Migration 019). API backfills `+{finalScore} pts` via `waitUntil(adminClient.update(...))` after scoring
-- Lazy Evaluation: `evaluateGhostClose()` auto-closes missed daily check-ins with `auto_closed = true` on any page load (Migration 020)
+- Auto-Close Cron: `POST /api/cron/auto-close-day` — Vercel Cron, Tue-Sat 7:00 UTC (2:00 AM COT). Evaluates previous business day (Mon-Fri). For users without `daily_close`/`missed_daily_close` bonus_event: inserts `missed_daily_close` (0 pts) + conditionally updates or inserts `daily_checkins` row. Idempotent: dedup via `gte(created_at, yesterdayStartUtc)` catches both event types. Data Loss Guard: if user has existing checkin, only sets `auto_closed=true` (metrics preserved).
 
 ## 5. Daily Check-in / "Cierre de Día" (Hito 4 — Phase Final)
 
