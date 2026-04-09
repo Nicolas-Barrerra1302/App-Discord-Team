@@ -88,13 +88,15 @@ export default function BonusesClient({
     const mPct = parseFloat(activeLaunch.margen_neto_pct ?? "0");
     const pPct = parseFloat(activeLaunch.pool_pct ?? "0");
     if (rev <= 0 || mPct <= 0 || pPct <= 0) return null;
-    const membersInput: BonusMemberInput[] = users.map((u) => ({
-      userId: u.id,
-      name: u.name,
-      avatarUrl: u.avatar_url,
-      role: u.role as UserRole,
-      points: teamRanking.find((r) => r.userId === u.id)?.totalPoints ?? 0,
-    }));
+    const membersInput: BonusMemberInput[] = users
+      .filter((u) => u.role !== 'ceo')
+      .map((u) => ({
+        userId: u.id,
+        name: u.name,
+        avatarUrl: u.avatar_url,
+        role: u.role as UserRole,
+        points: teamRanking.find((r) => r.userId === u.id)?.totalPoints ?? 0,
+      }));
     const sim = calculateBonuses(rev, mPct, pPct, membersInput);
     return sim.results.find((r) => r.userId === selectedMemberId)?.simulatedBonus ?? null;
   }, [selectedMemberId, currentUser.id, myEstimatedBonus, activeLaunch, users, teamRanking]);
@@ -111,13 +113,15 @@ export default function BonusesClient({
   const totalPool = netProfit * (poolPct / 100);
 
   const simulation = useMemo(() => {
-    const membersInput: BonusMemberInput[] = users.map((u) => ({
-      userId: u.id,
-      name: u.name,
-      avatarUrl: u.avatar_url,
-      role: u.role as UserRole,
-      points: memberPoints[u.id] ?? 0,
-    }));
+    const membersInput: BonusMemberInput[] = users
+      .filter((u) => u.role !== 'ceo')
+      .map((u) => ({
+        userId: u.id,
+        name: u.name,
+        avatarUrl: u.avatar_url,
+        role: u.role as UserRole,
+        points: memberPoints[u.id] ?? 0,
+      }));
     return calculateBonuses(revenue, marginPct, poolPct, membersInput);
   }, [revenue, marginPct, poolPct, memberPoints, users]);
 
@@ -437,7 +441,7 @@ export default function BonusesClient({
               Panel de Miembros
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {users.map((u) => {
+              {users.filter((u) => u.role !== 'ceo').map((u) => {
                 const result = simulation.results.find((r) => r.userId === u.id);
                 const points = memberPoints[u.id] ?? 0;
                 return (

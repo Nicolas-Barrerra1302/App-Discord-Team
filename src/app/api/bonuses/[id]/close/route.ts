@@ -107,11 +107,12 @@ export async function PUT(
     pointsByUser[evt.user_id] = (pointsByUser[evt.user_id] ?? 0) + evt.points;
   }
 
-  // --- Fetch all active users ---
+  // --- Fetch all active users (CEO excluded from pool distribution) ---
   const { data: activeUsers, error: usersError } = await supabase
     .from('users')
     .select('id, name, avatar_url, role')
-    .eq('is_active', true) as {
+    .eq('is_active', true)
+    .neq('role', 'ceo') as {
     data: Pick<User, 'id' | 'name' | 'avatar_url' | 'role'>[] | null;
     error: unknown;
   };

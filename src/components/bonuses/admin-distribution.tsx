@@ -31,17 +31,27 @@ export default function AdminDistribution({ ranking, launch, users }: AdminDistr
     return revenue * (marginPct / 100) * (poolPct / 100);
   }, [launch]);
 
+  // CEO excluded from pool distribution — filter by role using users prop
+  const ceoUserIds = useMemo(
+    () => new Set(users.filter((u) => u.role === 'ceo').map((u) => u.id)),
+    [users],
+  );
+  const filteredRanking = useMemo(
+    () => ranking.filter((r) => !ceoUserIds.has(r.userId)),
+    [ranking, ceoUserIds],
+  );
+
   // All math runs once via useMemo — no re-computation on re-renders
   const rows = useMemo(() => {
     if (!launch) return [];
 
-    // Sum all points from the global ranking (backend already aggregated)
-    const totalGlobalPoints = ranking.reduce(
+    // Sum all points from the global ranking (CEO excluded)
+    const totalGlobalPoints = filteredRanking.reduce(
       (sum, r) => sum + (r.totalPoints ?? 0),
       0
     );
 
-    return ranking.map((entry, idx) => {
+    return filteredRanking.map((entry, idx) => {
       // Guard division by zero — if no one has points show 0
       const sharePct =
         totalGlobalPoints > 0
@@ -60,7 +70,7 @@ export default function AdminDistribution({ ranking, launch, users }: AdminDistr
         projectedPayout,
       };
     });
-  }, [ranking, launch, totalPool]);
+  }, [filteredRanking, launch, totalPool]);
 
   // ---------------------------------------------------------------------------
   // No active launch
@@ -117,7 +127,7 @@ export default function AdminDistribution({ ranking, launch, users }: AdminDistr
           <p className="text-xs text-text-muted mb-1">Miembros</p>
           <div className="flex items-center gap-1.5">
             <Users className="w-4 h-4 text-text-muted" />
-            <p className="text-lg font-bold text-text">{ranking.length}</p>
+            <p className="text-lg font-bold text-text">{filteredRanking.length}</p>
           </div>
         </div>
       </div>

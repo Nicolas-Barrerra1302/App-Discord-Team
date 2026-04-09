@@ -70,13 +70,15 @@ export default async function BonusesPage() {
     const poolPct = parseFloat(activeLaunch.pool_pct ?? '0');
 
     if (revenue > 0 && marginPct > 0 && poolPct > 0) {
-      const membersInput = (users ?? []).map((u) => ({
-        userId: u.id,
-        name: u.name,
-        avatarUrl: u.avatar_url,
-        role: u.role as UserRole,
-        points: pointsMap[u.id] ?? 0,
-      }));
+      const membersInput = (users ?? [])
+        .filter((u) => u.role !== 'ceo')
+        .map((u) => ({
+          userId: u.id,
+          name: u.name,
+          avatarUrl: u.avatar_url,
+          role: u.role as UserRole,
+          points: pointsMap[u.id] ?? 0,
+        }));
 
       const simulation = calculateBonuses(revenue, marginPct, poolPct, membersInput);
       const myResult = simulation.results.find((r) => r.userId === user.id);
