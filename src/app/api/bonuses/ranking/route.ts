@@ -30,17 +30,38 @@ export async function GET(request: NextRequest) {
   // Use admin client to read all users' events (aggregate, not individual detail)
   const adminClient = createAdminClient();
 
+  // Fetch bonus-eligible users (excludes CEO per VIEW definition).
+  // Fallback: if migration 024 hasn't been applied yet, filter the users table in-app.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: eligibleFromView } = await (adminClient as any)
+    .from('bonus_eligible_users')
+    .select('id') as { data: { id: string }[] | null };
+
+  let eligibleIds: Set<string>;
+  if (eligibleFromView && eligibleFromView.length > 0) {
+    eligibleIds = new Set(eligibleFromView.map((u) => u.id));
+  } else {
+    // VIEW not yet deployed — fall back to users table filtered by role
+    const { data: fallbackUsers } = await adminClient
+      .from('users')
+      .select('id')
+      .eq('is_active', true)
+      .neq('role', 'ceo') as { data: { id: string }[] | null };
+    eligibleIds = new Set((fallbackUsers ?? []).map((u) => u.id));
+  }
+
   const { data: events, error } = await adminClient
     .from('bonus_events')
     .select('user_id, points')
-    .eq('launch_id', launchId) as { data: { user_id: string; points: number }[] | null; error: unknown };
+    .eq('launch_id', launchId)
+    .in('user_id', Array.from(eligibleIds)) as { data: { user_id: string; points: number }[] | null; error: unknown };
 
   if (error) {
     console.error('Ranking: error al obtener eventos:', error);
     return NextResponse.json({ error: 'Error al obtener ranking' }, { status: 500 });
   }
 
-  // Aggregate per user
+  // Aggregate per eligible user — CEO rows never reach this reducer
   const pointsMap: Record<string, number> = {};
   for (const evt of events ?? []) {
     pointsMap[evt.user_id] = (pointsMap[evt.user_id] ?? 0) + evt.points;

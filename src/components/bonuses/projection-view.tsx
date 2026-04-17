@@ -21,6 +21,8 @@ interface ProjectionViewProps {
   viewUserId?: string;
   /** Pre-computed estimated bonus for the viewUserId (admin impersonation only) */
   viewEstimatedBonus?: number | null;
+  /** Gate: whether the current user can see monetary bonus values */
+  canViewMoney: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,7 @@ export default function ProjectionView({
   users,
   viewUserId,
   viewEstimatedBonus,
+  canViewMoney,
 }: ProjectionViewProps) {
   // When admin impersonates a member, all ranking math uses the member's ID
   const effectiveUserId = viewUserId ?? currentUser.id;
@@ -162,7 +165,12 @@ export default function ProjectionView({
         {/* Estimated bonus */}
         <div className="bg-card-secondary rounded-xl p-4 col-span-2 sm:col-span-1">
           <p className="text-xs text-text-muted mb-1">Bono estimado</p>
-          {effectiveBonus !== null ? (
+          {!canViewMoney ? (
+            <div className="flex items-center gap-1 mt-1">
+              <Lock className="w-3.5 h-3.5 text-text-muted" />
+              <p className="text-sm text-text-muted">Visible solo para administración</p>
+            </div>
+          ) : effectiveBonus !== null ? (
             <p className="text-2xl font-bold text-success-neon tabular-nums [text-shadow:0_0_10px_currentColor]">
               {formatCurrency(effectiveBonus)}
             </p>
