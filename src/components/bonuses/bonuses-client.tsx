@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { calculateBonuses, formatCurrency } from "@/lib/bonuses/calculator";
+import { canViewBonusMoney } from "@/lib/bonuses/access";
 import BonusHistory from "@/components/bonuses/bonus-history";
 import RegistrarTab from "@/components/bonuses/registrar-tab";
 import PersonalTimeline from "@/components/bonuses/personal-timeline";
@@ -59,6 +60,7 @@ export default function BonusesClient({
   myEstimatedBonus,
 }: BonusesClientProps) {
   const isAdminUser = currentUser.role === "super_admin" || currentUser.role === "ceo";
+  const canViewMoney = canViewBonusMoney(currentUser);
 
   // ── All hooks at the top — React hooks rules require unconditional calls ──
 
@@ -227,9 +229,10 @@ export default function BonusesClient({
             teamRanking={teamRanking}
             myEstimatedBonus={myEstimatedBonus}
             users={users}
+            canViewMoney={canViewMoney}
           />
         )}
-        {activeTab === "ranking" && <RankingTab users={users} />}
+        {activeTab === "ranking" && <RankingTab users={users.filter((u) => u.role !== 'ceo')} />}
         {activeTab === "timeline" && <PersonalTimeline currentUser={currentUser} />}
       </div>
     );
@@ -308,6 +311,7 @@ export default function BonusesClient({
             users={users}
             viewUserId={selectedMemberId !== currentUser.id ? selectedMemberId : undefined}
             viewEstimatedBonus={selectedMemberId !== currentUser.id ? selectedMemberBonus : undefined}
+            canViewMoney={canViewMoney}
           />
         </div>
       )}
@@ -585,7 +589,7 @@ export default function BonusesClient({
       )}
       {activeTab === "history" && <BonusHistory currentUser={currentUser} users={users} />}
       {activeTab === "timeline" && <PersonalTimeline currentUser={currentUser} />}
-      {activeTab === "ranking" && <RankingTab users={users} />}
+      {activeTab === "ranking" && <RankingTab users={users.filter((u) => u.role !== 'ceo')} />}
       {activeTab === "distribution" && (
         <AdminDistribution ranking={teamRanking} launch={activeLaunch} users={users} />
       )}
