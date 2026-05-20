@@ -27,6 +27,7 @@ export async function getCurrentUser(
     .from('users')
     .select('*')
     .eq('discord_id', discordId)
+    .eq('is_active', true)
     .single();
 
   if (error || !data) return null;

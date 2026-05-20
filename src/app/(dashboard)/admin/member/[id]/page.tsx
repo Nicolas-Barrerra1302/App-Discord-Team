@@ -18,11 +18,12 @@ export default async function MemberDetailPage({
   if (!currentUser) redirect("/login");
   if (!isAdmin(currentUser)) redirect("/dashboard");
 
-  // Fetch target user
+  // Fetch target user (only active users are accessible)
   const { data: targetUser } = (await supabase
     .from("users")
     .select("*")
     .eq("id", id)
+    .eq("is_active", true)
     .single()) as { data: User | null };
 
   if (!targetUser) redirect("/admin");

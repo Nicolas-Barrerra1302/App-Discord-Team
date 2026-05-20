@@ -21,9 +21,10 @@ export default async function DashboardLayout({
     .from("users")
     .select("*")
     .eq("discord_id", discordId)
+    .eq("is_active", true)
     .single()) as { data: User | null };
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?error=unauthorized");
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

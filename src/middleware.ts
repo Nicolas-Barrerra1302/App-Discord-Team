@@ -56,14 +56,15 @@ export async function middleware(request: NextRequest) {
         .from('users')
         .select('id')
         .eq('discord_id', discordId)
+        .eq('is_active', true)
         .single();
 
       if (!dbUser) {
-        // Valid auth session but not in whitelist — destroy session
+        // Valid auth session but not in whitelist or user is inactive — destroy session
         await supabase.auth.signOut();
         const url = request.nextUrl.clone();
         url.pathname = '/login';
-        url.searchParams.set('error', 'not_in_whitelist');
+        url.searchParams.set('error', 'unauthorized');
         return NextResponse.redirect(url);
       }
     }

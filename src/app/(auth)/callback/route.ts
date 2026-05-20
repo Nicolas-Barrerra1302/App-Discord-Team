@@ -29,11 +29,12 @@ export async function GET(request: Request) {
           );
         }
 
-        // Whitelist check: user must exist in the pre-seeded users table
+        // Whitelist check: user must exist in the pre-seeded users table AND be active
         const { data: dbUser } = await supabase
           .from('users')
           .select('id, discord_id, role, name, avatar_url')
           .eq('discord_id', discordId)
+          .eq('is_active', true)
           .single();
 
         if (!dbUser) {

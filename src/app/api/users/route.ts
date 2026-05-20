@@ -17,6 +17,7 @@ export async function GET() {
   const { data: users, error } = await supabase
     .from('users')
     .select('id, name, avatar_url, role, area, is_active')
+    .eq('is_active', true)
     .order('name', { ascending: true }) as {
     data: Pick<User, 'id' | 'name' | 'avatar_url' | 'role' | 'area' | 'is_active'>[] | null;
     error: unknown;
